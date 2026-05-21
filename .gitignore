@@ -36,12 +36,16 @@ desktop.ini
 output/*.mdx
 output/*.pdf
 output/*.html
+output/*.bak
 
 # Secrets / environment config
 .env
 .env.local
 .env.*.local
 secrets.json
+
+# Streamlit local config and cache
+.streamlit/
 
 # Claude Code local settings (machine-specific)
 .claude/settings.local.json

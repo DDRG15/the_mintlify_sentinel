@@ -40,6 +40,12 @@ secrets.json
 # CI config — not needed inside the container
 .github/
 
+# Session notes
+TOMORROW.md
+
+# Streamlit local config
+.streamlit/
+
 # pytest / coverage artifacts
 .pytest_cache/
 .coverage

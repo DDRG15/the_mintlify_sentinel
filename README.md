@@ -46,7 +46,7 @@ target-openapi.json  ───┘                                  │
 ## Setup
 
 ```bash
-# Python 3.9+ required
+# Python 3.10+ required
 pip install -r requirements.txt
 ```
 
@@ -58,7 +58,7 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
-Opens at `http://localhost:8501`. Upload two OpenAPI specs, click **Run Sentinel**, and see findings as colored cards. Slack and Discord webhook URLs can be entered in the sidebar — notifications fire automatically after each run. A second tab runs the docs.json validator in isolation.
+Opens at `http://localhost:8501`. Upload two OpenAPI specs, click **Run Sentinel**, and see findings as colored cards. Slack and Discord webhook URLs can be entered in the sidebar — notifications fire automatically after each run. A second tab runs the docs.json validator in isolation. A collapsible pipeline log shows the full stage output after each run.
 
 ---
 
@@ -80,15 +80,21 @@ python main.py --help
 
 The rendered changelog is written to `output/changelog.mdx`.
 
-Webhook URLs can also be supplied via environment variables instead of flags:
+Webhook URLs can also be supplied via environment variables:
 
 ```bash
+# Linux / macOS
 export SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
 export DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/...
+
+# Windows PowerShell
+$env:SLACK_WEBHOOK_URL="https://hooks.slack.com/services/..."
+$env:DISCORD_WEBHOOK_URL="https://discord.com/api/webhooks/..."
+
 python main.py
 ```
 
-Copy `.env.example` to `.env` and fill in the placeholders to persist them locally.
+Copy `.env.example` to `.env` and fill in the placeholders to persist them locally. `.env` is listed in `.gitignore` and will never be committed.
 
 ---
 
@@ -108,23 +114,27 @@ pytest tests/ -v
 pytest tests/ -v --cov=scripts --cov-report=term-missing
 ```
 
-The suite covers all three severity tiers, edge cases (empty spec, malformed JSON, vendor extension keys), and integration tests against the real fixture files.
+68 tests across 4 modules: `test_judge_config`, `test_judge_diff`, `test_architect_render`, `test_notifier`. Covers all three severity tiers, edge cases (empty spec, malformed JSON, vendor extension keys), webhook HTTP success/failure paths, and integration tests against the real fixture files. A session fixture in `conftest.py` preserves `output/changelog.mdx` across test runs.
 
 ---
 
 ## Docker
 
 ```bash
+# Build
 docker build -t mintlify-sentinel .
 
-# Default run
+# Run pipeline (default)
 docker run --rm mintlify-sentinel
 
-# Mount your own specs
+# Mount your own specs and retrieve output
 docker run --rm \
   -v "$(pwd)/input:/app/input" \
   -v "$(pwd)/output:/app/output" \
   mintlify-sentinel
+
+# Run the browser UI
+docker run --rm -p 8501:8501 mintlify-sentinel streamlit run app.py --server.address 0.0.0.0
 ```
 
 ---
@@ -143,11 +153,15 @@ python scripts/architect_render.py      # render changelog from last diff
 
 ```
 the_mintlify_sentinel/
-  main.py                         Master orchestrator
-  docs.json                       Mintlify site config
+  main.py                         Master orchestrator (CLI entry point)
   app.py                          Streamlit browser UI
+  docs.json                       Mintlify site config
   requirements.txt                Pinned Python dependencies
   Dockerfile
+  .dockerignore
+  .gitignore
+  .gitattributes                  LF line ending normalization
+  .env.example                    Webhook URL template (copy to .env)
   input/
     admin-openapi.json            Baseline spec (V1)
     analytics.openapi.json        Target spec (V2)
@@ -168,9 +182,13 @@ the_mintlify_sentinel/
     test_architect_render.py
     test_notifier.py
   docs/
-    README_layperson.md
-    README_semi_tech.md
-    README_pitch.md
+    README_layperson.md           Non-technical explanation
+    README_semi_tech.md           Semi-technical overview
+    README_pitch.md               Product pitch
+    STREAMLIT_PLAN.md             UI implementation record
+  .github/
+    workflows/
+      sentinel.yml                CI: test → pipeline → artifact upload
 ```
 
 ---
