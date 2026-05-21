@@ -1,11 +1,25 @@
 # =============================================================================
-# judge_diff.py  ·  VERSION 2.0  —  "Semantic Diffing"
+# judge_diff.py  ·  VERSION 3.0  —  "Schema Drift Detection"
 # The Mintlify Sentinel — Diff Engine
 #
-# CHANGELOG (v1 → v2):
+# CHANGELOG (v2 → v3):
 # ┌─────────────────────────────────────────────────────────────────────────┐
 # │  WHAT CHANGED                          WHY                             │
 # ├─────────────────────────────────────────────────────────────────────────┤
+# │  load_openapi() now parses YAML        Real-world specs are frequently │
+# │  in addition to JSON (pyyaml).         written in YAML. JSON is tried  │
+# │  Auto-detects format by content.       first; YAML is the fallback.    │
+# ├─────────────────────────────────────────────────────────────────────────┤
+# │  Phase 2: Rule C added                 Catches response body and       │
+# │  → SCHEMA_DRIFT (MEDIUM)               request body schema changes     │
+# │  Fires between Rule B (MEDIUM) and     that survive the endpoint-level │
+# │  Rule A (LOW). Checks `responses`      diff. An endpoint can exist and │
+# │  and `requestBody` serialised diffs.   have identical parameters but a │
+# │                                        silently changed response shape. │
+# └─────────────────────────────────────────────────────────────────────────┘
+#
+# CHANGELOG (v1 → v2):
+# ┌─────────────────────────────────────────────────────────────────────────┐
 # │  extract_contracts() → returns dict    Phase 2 needs the operation     │
 # │  instead of set                        body, not just the signature.   │
 # ├─────────────────────────────────────────────────────────────────────────┤
@@ -22,7 +36,7 @@
 #
 # SEVERITY LADDER:
 #   CRITICAL  Endpoint deleted. All existing clients break on next deploy.
-#   MEDIUM    Parameters changed. Clients using removed/renamed params break.
+#   MEDIUM    Parameters changed, or request/response body schema changed.
 #   LOW       Only docs/description text changed. Zero runtime impact.
 #
 # PIPELINE POSITION:
@@ -38,9 +52,15 @@
 #   Always 0. The Sentinel reports; it does not block.
 # =============================================================================
 
-import json    # [standard library: deserialise OpenAPI files; pretty-print output]
+import json    # [standard library: deserialise JSON OpenAPI files; pretty-print output]
 import sys     # [standard library: read CLI arguments; emit the final exit code]
 import os      # [standard library: resolve CWD-independent absolute file paths]
+
+try:
+    import yaml as _yaml  # [pyyaml: YAML-format OpenAPI spec support (pip install pyyaml)]
+    _YAML_AVAILABLE = True
+except ImportError:
+    _YAML_AVAILABLE = False
 
 
 # =============================================================================
@@ -66,21 +86,43 @@ def load_openapi(filepath: str) -> dict:
     if not os.path.isfile(abs_path):
         raise RuntimeError(f"[FILE NOT FOUND] No file at path: {abs_path}")
 
-    # [Open with explicit UTF-8 encoding. The OpenAPI Specification mandates
-    #  UTF-8 for JSON documents; any other encoding signals a corrupted file.]
+    # [Read the raw content once. Format is auto-detected from the content
+    #  itself, not the file extension — Streamlit writes uploaded files to
+    #  temp paths with .json suffixes regardless of the original format.]
     with open(abs_path, "r", encoding="utf-8") as fh:
-        try:
-            # [Deserialise the entire file into a Python dict in one call.
-            #  json.load() raises JSONDecodeError on any syntax fault, embedding
-            #  the line and column number of the problem in the exception.]
-            data = json.load(fh)
-        except json.JSONDecodeError as exc:
-            raise RuntimeError(
-                f"[INVALID JSON] Could not parse: {abs_path}\n"
-                f"  JSONDecodeError: {exc}"
-            )
+        content = fh.read()
 
-    # [Return the raw dict. Callers decide how to interpret its structure.]
+    # [Try JSON first. It is the most common format for machine-generated
+    #  OpenAPI specs and requires no third-party dependency.]
+    try:
+        return json.loads(content)
+    except json.JSONDecodeError:
+        pass
+
+    # [JSON failed — try YAML. Many hand-authored specs use YAML.
+    #  yaml.safe_load() never executes arbitrary Python, making it safe for
+    #  untrusted input. If pyyaml is not installed, surface a clear install
+    #  instruction rather than a cryptic ImportError traceback.]
+    if not _YAML_AVAILABLE:
+        raise RuntimeError(
+            f"[INVALID JSON] Could not parse: {abs_path}\n"
+            f"  The file does not appear to be valid JSON.\n"
+            f"  To support YAML format: pip install pyyaml"
+        )
+
+    try:
+        data = _yaml.safe_load(content)
+    except Exception as exc:
+        raise RuntimeError(
+            f"[INVALID FORMAT] Could not parse as JSON or YAML: {abs_path}\n"
+            f"  Error: {exc}"
+        )
+
+    if not isinstance(data, dict):
+        raise RuntimeError(
+            f"[INVALID FORMAT] Parsed YAML did not produce a dict: {abs_path}"
+        )
+
     return data
 
 
@@ -355,6 +397,45 @@ def _find_modified_endpoints(v1_contracts: dict, v2_contracts: dict) -> list:
             #  to enforce the single-finding-per-endpoint contract.]
             continue
 
+        # ── RULE C — SCHEMA_DRIFT (MEDIUM) ────────────────────────────────────
+
+        # [Compare the serialised `responses` and `requestBody` objects between
+        #  V1 and V2. These hold the actual data shapes the endpoint exchanges
+        #  with clients — a change here is a contract break even when the
+        #  endpoint URL and parameters are unchanged.
+        #
+        #  json.dumps with sort_keys=True gives a canonical string that is
+        #  independent of key-ordering variation between spec authors or tooling,
+        #  preventing false positives from cosmetic reformatting.]
+        v1_responses    = json.dumps(v1_op.get("responses",    {}), sort_keys=True)
+        v2_responses    = json.dumps(v2_op.get("responses",    {}), sort_keys=True)
+        v1_request_body = json.dumps(v1_op.get("requestBody",  {}), sort_keys=True)
+        v2_request_body = json.dumps(v2_op.get("requestBody",  {}), sort_keys=True)
+
+        responses_drifted    = v1_responses    != v2_responses
+        request_body_drifted = v1_request_body != v2_request_body
+
+        if responses_drifted or request_body_drifted:
+            drifted_parts = []
+            if request_body_drifted:
+                drifted_parts.append("request body schema")
+            if responses_drifted:
+                drifted_parts.append("response schema")
+            drifted_str = " and ".join(drifted_parts)
+
+            findings.append({
+                "signature":   signature,
+                "method":      method,
+                "path":        path,
+                "severity":    "MEDIUM",
+                "change_type": "SCHEMA_DRIFT",
+                "description": (
+                    f"The {drifted_str} changed between versions. "
+                    "Clients that depend on the previous data shape may break."
+                ),
+            })
+            continue
+
         # ── RULE A — DOCS_UPDATED (LOW) ────────────────────────────────────
 
         # [Extract the two documentation text fields from each operation.
@@ -490,7 +571,7 @@ def print_report(
     print(f"  TARGET   (V2) : {os.path.abspath(target_path)}")
     print(f"  TOTAL FINDINGS: {total}")
     print(f"    ✗ CRITICAL   : {counts['CRITICAL']}  (ENDPOINT_REMOVED)")
-    print(f"    ⚠ MEDIUM     : {counts['MEDIUM']}  (PARAMETERS_MODIFIED)")
+    print(f"    ⚠ MEDIUM     : {counts['MEDIUM']}  (PARAMETERS_MODIFIED | SCHEMA_DRIFT)")
     print(f"    ℹ LOW        : {counts['LOW']}  (DOCS_UPDATED)")
     print("=" * 70 + "\n")
 

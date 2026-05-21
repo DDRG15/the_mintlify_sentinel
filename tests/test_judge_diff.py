@@ -232,6 +232,80 @@ class TestLowFindings:
 
 
 # ---------------------------------------------------------------------------
+# MEDIUM — schema drift (response / request body changes)
+# ---------------------------------------------------------------------------
+
+class TestSchemaDrift:
+
+    def test_response_schema_change_produces_schema_drift(self):
+        v1_op = {"responses": {"200": {"content": {"application/json": {
+            "schema": {"type": "object", "properties": {"id": {"type": "string"}}}}}}}}
+        v2_op = {"responses": {"200": {"content": {"application/json": {
+            "schema": {"type": "object", "properties": {"id": {"type": "integer"}}}}}}}}
+        v1 = extract_contracts(_make_spec({"/users": {"get": v1_op}}))
+        v2 = extract_contracts(_make_spec({"/users": {"get": v2_op}}))
+        findings = _find_modified_endpoints(v1, v2)
+        assert len(findings) == 1
+        assert findings[0]["change_type"] == "SCHEMA_DRIFT"
+        assert findings[0]["severity"] == "MEDIUM"
+        assert "response schema" in findings[0]["description"]
+
+    def test_request_body_change_produces_schema_drift(self):
+        v1_op = {"requestBody": {"content": {"application/json": {
+            "schema": {"required": ["name"], "properties": {"name": {"type": "string"}}}}}}}
+        v2_op = {"requestBody": {"content": {"application/json": {
+            "schema": {"required": ["name", "email"], "properties": {
+                "name": {"type": "string"}, "email": {"type": "string"}}}}}}}
+        v1 = extract_contracts(_make_spec({"/users": {"post": v1_op}}))
+        v2 = extract_contracts(_make_spec({"/users": {"post": v2_op}}))
+        findings = _find_modified_endpoints(v1, v2)
+        assert len(findings) == 1
+        assert findings[0]["change_type"] == "SCHEMA_DRIFT"
+        assert "request body schema" in findings[0]["description"]
+
+    def test_identical_schema_produces_no_drift(self):
+        op = {"responses": {"200": {"content": {"application/json": {
+            "schema": {"type": "object", "properties": {"id": {"type": "string"}}}}}}}}
+        v1 = extract_contracts(_make_spec({"/users": {"get": op}}))
+        v2 = extract_contracts(_make_spec({"/users": {"get": op}}))
+        assert _find_modified_endpoints(v1, v2) == []
+
+    def test_schema_drift_suppressed_by_parameters_modified(self):
+        v1_op = {
+            "parameters": [{"name": "limit", "in": "query"}],
+            "responses": {"200": {"content": {"application/json": {
+                "schema": {"type": "object", "properties": {"id": {"type": "string"}}}}}}},
+        }
+        v2_op = {
+            "parameters": [],
+            "responses": {"200": {"content": {"application/json": {
+                "schema": {"type": "object", "properties": {"id": {"type": "integer"}}}}}}},
+        }
+        v1 = extract_contracts(_make_spec({"/users": {"get": v1_op}}))
+        v2 = extract_contracts(_make_spec({"/users": {"get": v2_op}}))
+        findings = _find_modified_endpoints(v1, v2)
+        assert len(findings) == 1
+        assert findings[0]["change_type"] == "PARAMETERS_MODIFIED"
+
+    def test_schema_drift_suppresses_docs_updated(self):
+        v1_op = {
+            "summary": "Get user",
+            "responses": {"200": {"content": {"application/json": {
+                "schema": {"properties": {"id": {"type": "string"}}}}}}},
+        }
+        v2_op = {
+            "summary": "Retrieve user",
+            "responses": {"200": {"content": {"application/json": {
+                "schema": {"properties": {"id": {"type": "integer"}}}}}}},
+        }
+        v1 = extract_contracts(_make_spec({"/users/{id}": {"get": v1_op}}))
+        v2 = extract_contracts(_make_spec({"/users/{id}": {"get": v2_op}}))
+        findings = _find_modified_endpoints(v1, v2)
+        assert len(findings) == 1
+        assert findings[0]["change_type"] == "SCHEMA_DRIFT"
+
+
+# ---------------------------------------------------------------------------
 # Sorting and combining
 # ---------------------------------------------------------------------------
 
@@ -276,8 +350,34 @@ class TestEdgeCases:
         tmp.write("not valid json {{{")
         tmp.close()
         try:
-            with pytest.raises(RuntimeError, match="INVALID JSON"):
+            # With pyyaml installed the loader tries JSON then YAML; both fail
+            # so the message is "INVALID FORMAT". Without pyyaml it is
+            # "INVALID JSON". Both contain "INVALID".
+            with pytest.raises(RuntimeError, match="INVALID"):
                 load_openapi(tmp.name)
+        finally:
+            os.unlink(tmp.name)
+
+    def test_yaml_spec_loads_correctly(self):
+        yaml_content = (
+            "openapi: '3.0.1'\n"
+            "info:\n"
+            "  title: YAML API\n"
+            "  version: '1.0'\n"
+            "paths:\n"
+            "  /users:\n"
+            "    get:\n"
+            "      summary: List users\n"
+        )
+        tmp = tempfile.NamedTemporaryFile(
+            mode="w", suffix=".yaml", delete=False, encoding="utf-8"
+        )
+        tmp.write(yaml_content)
+        tmp.close()
+        try:
+            doc = load_openapi(tmp.name)
+            assert doc["info"]["title"] == "YAML API"
+            assert "/users" in doc["paths"]
         finally:
             os.unlink(tmp.name)
 

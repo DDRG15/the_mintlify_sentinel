@@ -124,7 +124,7 @@ with tab_run:
         st.caption("The last known-good API contract.")
         baseline_file = st.file_uploader(
             "Baseline",
-            type=["json"],
+            type=["json", "yaml", "yml"],
             label_visibility="collapsed",
             key="baseline_upload",
         )
@@ -136,7 +136,7 @@ with tab_run:
         st.caption("The candidate being promoted to production.")
         target_file = st.file_uploader(
             "Target",
-            type=["json"],
+            type=["json", "yaml", "yml"],
             label_visibility="collapsed",
             key="target_upload",
         )

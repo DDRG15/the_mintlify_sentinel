@@ -11,6 +11,11 @@ pydantic==2.7.4
 # Jinja2: used by architect_render.py for MDX changelog template rendering.
 jinja2==3.1.4
 
+# PyYAML: allows load_openapi() to parse YAML-format OpenAPI specs in addition
+# to JSON. Many real-world specs are written in YAML; without this dependency
+# the diff engine would reject them with an "INVALID JSON" error.
+pyyaml==6.0.2
+
 # --- PDF rendering (architect_pdf.py) ---
 
 # Markdown: converts Markdown text to HTML before WeasyPrint processes it.
