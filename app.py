@@ -1,3 +1,5 @@
+import contextlib
+import io
 import os
 import sys
 import tempfile
@@ -161,9 +163,11 @@ with tab_run:
             target_path = f2.name
 
         try:
+            log_buf = io.StringIO()
             with st.spinner("Running Sentinel..."):
-                findings = run_diff(baseline_path, target_path)
-                render_changelog(findings)
+                with contextlib.redirect_stdout(log_buf):
+                    findings = run_diff(baseline_path, target_path)
+                    render_changelog(findings)
 
                 notif_result = None
                 if slack_url or discord_url:
@@ -173,9 +177,10 @@ with tab_run:
                         discord_url=discord_url,
                     )
 
-            st.session_state["findings"]    = findings
-            st.session_state["last_run"]    = datetime.now().strftime("%H:%M:%S")
+            st.session_state["findings"]     = findings
+            st.session_state["last_run"]     = datetime.now().strftime("%H:%M:%S")
             st.session_state["notif_result"] = notif_result
+            st.session_state["pipeline_log"] = log_buf.getvalue()
 
         except Exception as exc:
             st.error(f"Pipeline error: {exc}")
@@ -238,7 +243,13 @@ with tab_run:
                 use_container_width=True,
             )
 
-        # Raw JSON expander (developer view)
+        # Pipeline log (developer view)
+        pipeline_log = st.session_state.get("pipeline_log", "")
+        if pipeline_log:
+            with st.expander("Pipeline log"):
+                st.code(pipeline_log, language="text")
+
+        # Raw JSON findings (developer view)
         with st.expander("Raw JSON findings"):
             st.json(findings if findings else [])
 

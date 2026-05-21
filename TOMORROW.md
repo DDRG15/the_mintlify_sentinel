@@ -1,40 +1,70 @@
 # Next Session
 
-## Step 1 — Streamlit UI, Phase 1 (~3-4 hours)
+## The Sentinel is feature-complete for v1.
 
-All live tests are done. Discord, Slack, and Docker are confirmed working.
-The only thing left to build is the browser interface.
+All planned work is done. Use this session for one of the following:
 
-Open `docs/STREAMLIT_PLAN.md` and start Phase 1.
+---
 
-### What to do first
+## Option A — Push to GitHub
 
-1. Add `streamlit==1.35.0` to `requirements.txt`
-2. Run `pip install streamlit==1.35.0`
-3. Create `app.py` in the project root
+The repo is clean and ready. No webhook URLs in any tracked file.
 
-### What Phase 1 includes
+1. Create a new repo at github.com (public or private — your call)
+2. Add the remote and push:
 
-- Page title and description
-- File uploader — baseline spec (V1)
-- File uploader — target spec (V2)
-- "Run Sentinel" button
-- Results section:
-  - Summary bar: X CRITICAL / Y MEDIUM / Z LOW
-  - One colored card per finding (red, yellow, blue)
-  - Clean diff message if no findings
-- Download button for `output/changelog.mdx`
+```bash
+git remote add origin https://github.com/DDRG15/the-mintlify-sentinel.git
+git push -u origin main
+```
 
-### Run command
+GitHub Actions will trigger automatically and run the full test suite + pipeline.
+
+---
+
+## Option B — Schema Drift Detection (next feature)
+
+Extend the diff engine beyond endpoint-level changes to catch response
+body schema mutations: field type changes, required field additions, etc.
+
+Files to modify:
+- `scripts/judge_diff.py` — add Phase 3: response schema comparison
+- `tests/test_judge_diff.py` — extend with schema drift test cases
+- `templates/changelog.mdx.jinja` — no changes needed (severity system handles it)
+
+---
+
+## Option C — Try the UI
+
+If you haven't tested the Streamlit UI yet:
 
 ```bash
 streamlit run app.py
 ```
 
+Open http://localhost:8501, upload these two files:
+- V1: `input/admin-openapi.json`
+- V2: `input/analytics.openapi.json`
+
+Expected: 6 red CRITICAL cards, download button, pipeline log expander.
+
 ---
 
-## Completed
+## Completed — v1.0
 
-- [x] Discord live test — HTTP 204, 6 CRITICAL findings delivered
-- [x] Slack live test — HTTP 200, delivered
-- [x] Docker build + run — full pipeline inside container, exits 0
+- [x] requirements.txt
+- [x] Template bug fix (severity-conditional callouts)
+- [x] argparse CLI flags
+- [x] Step label fix (STEP 4/4)
+- [x] Circular import fix
+- [x] 68 tests — judge_config, judge_diff, architect_render, notifier
+- [x] conftest.py — test isolation for output/changelog.mdx
+- [x] Slack + Discord webhook notifier
+- [x] README.md (GitHub, layperson, semi-tech, pitch)
+- [x] Dockerfile + .dockerignore
+- [x] GitHub Actions CI
+- [x] .gitignore + .gitattributes + .env.example
+- [x] Discord live test — HTTP 204
+- [x] Slack live test — HTTP 200
+- [x] Docker live test — exits 0
+- [x] Streamlit UI — all 4 phases (core, webhooks, validator tab, polish)

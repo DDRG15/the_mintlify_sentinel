@@ -52,6 +52,16 @@ pip install -r requirements.txt
 
 ---
 
+## Browser UI
+
+```bash
+streamlit run app.py
+```
+
+Opens at `http://localhost:8501`. Upload two OpenAPI specs, click **Run Sentinel**, and see findings as colored cards. Slack and Discord webhook URLs can be entered in the sidebar — notifications fire automatically after each run. A second tab runs the docs.json validator in isolation.
+
+---
+
 ## Running the Pipeline
 
 ```bash
@@ -135,6 +145,7 @@ python scripts/architect_render.py      # render changelog from last diff
 the_mintlify_sentinel/
   main.py                         Master orchestrator
   docs.json                       Mintlify site config
+  app.py                          Streamlit browser UI
   requirements.txt                Pinned Python dependencies
   Dockerfile
   input/
@@ -151,6 +162,7 @@ the_mintlify_sentinel/
   templates/
     changelog.mdx.jinja           Jinja2 template
   tests/
+    conftest.py                   Session fixture — preserves output/changelog.mdx across test runs
     test_judge_config.py
     test_judge_diff.py
     test_architect_render.py
@@ -168,5 +180,3 @@ the_mintlify_sentinel/
 **`architect_pdf.py`** uses naive string replacement to convert Mintlify MDX callouts to HTML for PDF rendering. This is not in the main pipeline and is not covered by the test suite. Use the MDX output for production; the PDF variant is a utility for internal distribution only.
 
 **`weasyprint` on Windows** requires Cairo and Pango native libraries not available by default. Run inside Docker if PDF output is needed on a Windows machine.
-
-**`output/changelog.mdx`** is overwritten on every pipeline run and on every test run. If you need a persistent changelog history, version-control the output directory or implement a separate archiving step downstream.
