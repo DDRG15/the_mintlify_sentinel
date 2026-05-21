@@ -46,16 +46,19 @@ The Sentinel is a production-ready Python CLI with:
 - Pydantic v2 schema validation for docs.json
 - Two-phase semantic diff engine (set difference + intersection analysis)
 - Jinja2-powered MDX changelog rendering with severity-conditional Mintlify callouts
-- Full pytest test suite across all three pipeline stages
+- Slack and Discord webhook notifications (no extra dependencies — stdlib only)
+- Full pytest test suite (68 tests) across all four pipeline stages
 - GitHub Actions CI workflow
 - Docker support for containerized execution
 
 It runs against any two OpenAPI 3.x specification files and integrates with any CI/CD system that can execute a Python script.
 
+Webhook notifications are included — pass `--slack-webhook` or `--discord-webhook` to receive a formatted findings summary in your channel the moment the pipeline completes. URLs can also be set via `SLACK_WEBHOOK_URL` / `DISCORD_WEBHOOK_URL` environment variables.
+
 ## What's Next
 
 The roadmap is straightforward:
-1. **Webhook delivery** — push the changelog diff to Slack, Linear, or any webhook endpoint at pipeline time, not just file output
+1. **Browser UI** — a Streamlit interface so non-engineers can upload specs and run the pipeline without touching a terminal
 2. **Schema drift detection** — extend beyond endpoint-level changes to catch response body schema mutations (field type changes, required field additions)
 3. **Version history** — track diffs across multiple release pairs and surface trends (which endpoints change most frequently, which are stable)
 4. **Mintlify native integration** — a Mintlify app extension that runs the Sentinel automatically on every docs deployment, without a separate CI step

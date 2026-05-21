@@ -61,11 +61,24 @@ python main.py
 # Explicit paths
 python main.py --baseline path/to/v1.json --target path/to/v2.json --config path/to/docs.json
 
+# With Slack and/or Discord notifications
+python main.py --slack-webhook https://hooks.slack.com/services/... --discord-webhook https://discord.com/api/webhooks/...
+
 # Show all flags
 python main.py --help
 ```
 
 The rendered changelog is written to `output/changelog.mdx`.
+
+Webhook URLs can also be supplied via environment variables instead of flags:
+
+```bash
+export SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
+export DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/...
+python main.py
+```
+
+Copy `.env.example` to `.env` and fill in the placeholders to persist them locally.
 
 ---
 
@@ -133,6 +146,7 @@ the_mintlify_sentinel/
     judge_config.py               Stage 1: docs.json validator (Pydantic v2)
     judge_diff.py                 Stage 2: semantic diff engine
     architect_render.py           Stage 3: Jinja2 MDX renderer
+    notifier.py                   Slack + Discord webhook dispatcher
     architect_pdf.py              PDF variant (optional, requires system deps)
   templates/
     changelog.mdx.jinja           Jinja2 template
@@ -140,6 +154,7 @@ the_mintlify_sentinel/
     test_judge_config.py
     test_judge_diff.py
     test_architect_render.py
+    test_notifier.py
   docs/
     README_layperson.md
     README_semi_tech.md

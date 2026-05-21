@@ -16,8 +16,31 @@ python main.py --discord-webhook YOUR_DISCORD_WEBHOOK_URL_HERE
 
 ---
 
-## Step 2 — Start Streamlit UI (rest of the session)
+## Step 2 — Docker Test (10 min)
 
-Once the live test passes, open `docs/STREAMLIT_PLAN.md` and start Phase 1.
+Docker Desktop is installed. Run these two commands from the project root:
+
+```bash
+docker build -t mintlify-sentinel .
+docker run --rm mintlify-sentinel
+```
+
+Expected output: the full 4-stage pipeline runs inside the container, same as `python main.py` locally.
+
+To mount your own specs and retrieve the output file:
+
+```bash
+docker run --rm \
+  -v "$(pwd)/input:/app/input" \
+  -v "$(pwd)/output:/app/output" \
+  mintlify-sentinel
+```
+
+---
+
+## Step 3 — Start Streamlit UI (rest of the session)
+
+Once the live tests pass, open `docs/STREAMLIT_PLAN.md` and start Phase 1.
 
 The first file to create is `app.py` in the project root.
+Add `streamlit==1.35.0` to `requirements.txt` before starting.
