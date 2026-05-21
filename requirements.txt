@@ -21,6 +21,11 @@ markdown==3.6
 # Local install on Windows requires MSYS2/vcpkg; use Docker instead.
 weasyprint==62.3
 
+# --- Streamlit UI ---
+
+# Browser interface for the Sentinel pipeline.
+streamlit==1.35.0
+
 # --- Testing ---
 
 # pytest: test runner for the tests/ suite.
