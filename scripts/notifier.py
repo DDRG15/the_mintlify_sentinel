@@ -75,7 +75,10 @@ def _post_json(url: str, payload: dict) -> tuple:
     req  = urllib.request.Request(
         url,
         data=body,
-        headers={"Content-Type": "application/json"},
+        headers={
+            "Content-Type": "application/json",
+            "User-Agent": "MintlifySentinel/1.0",
+        },
         method="POST",
     )
     try:
