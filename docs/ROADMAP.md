@@ -1,7 +1,7 @@
 # The Mintlify Sentinel — Roadmap
 
 > Last updated: 2026-05-21
-> Current version: v1.1 (post-YAML + schema drift)
+> Current version: v1.2 (granular schema diff)
 
 ---
 
@@ -16,29 +16,18 @@
 | Streamlit browser UI (all 4 phases) | ✅ Done |
 | Docker support | ✅ Done |
 | GitHub Actions CI | ✅ Done |
-| 74 tests (judge_config, judge_diff, architect_render, notifier) | ✅ Done |
+| 95 tests (judge_config, judge_diff, architect_render, notifier) | ✅ Done |
 | YAML OpenAPI spec support | ✅ Done |
 | Schema drift detection (SCHEMA_DRIFT — MEDIUM) | ✅ Done |
+| Granular schema diff (field-level: added/removed/type/required) | ✅ Done |
 
 ---
 
 ## Next to Build
 
-### Priority 1 — Granular schema diff (v1.2)
+### ~~Priority 1 — Granular schema diff (v1.2)~~ ✅ SHIPPED
 
-**What:** Instead of "response schema changed", tell the developer *exactly* what changed:
-- Which fields were added / removed
-- Which field types changed (`string` → `integer`)
-- Which fields became required
-
-**Why it matters:** The current SCHEMA_DRIFT finding says "the response schema changed" — useful, but not actionable on its own. A developer still has to open both specs to know what changed. Granular output makes the finding self-contained.
-
-**Where to build it:**
-- `scripts/judge_diff.py` — replace the serialised-diff check in Rule C with a recursive property-level walker
-- `templates/changelog.mdx.jinja` — add a sub-list of changed fields inside the `<Warning>` callout
-- `tests/test_judge_diff.py` — add field-level assertions
-
-**Estimated effort:** 3–4 hours
+Field-level diff is live. SCHEMA_DRIFT findings now include `response_schema_changes` and `request_body_schema_changes` lists with per-field entries: `field_added`, `field_removed`, `type_changed`, `became_required`, `became_optional`. The MDX changelog renders a sub-list of changed fields inside the `<Warning>` callout.
 
 ---
 

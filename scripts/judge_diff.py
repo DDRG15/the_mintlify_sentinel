@@ -1,6 +1,20 @@
 # =============================================================================
-# judge_diff.py  ·  VERSION 3.0  —  "Schema Drift Detection"
+# judge_diff.py  ·  VERSION 4.0  —  "Granular Schema Diff"
 # The Mintlify Sentinel — Diff Engine
+#
+# CHANGELOG (v3 → v4):
+# ┌─────────────────────────────────────────────────────────────────────────┐
+# │  WHAT CHANGED                          WHY                             │
+# ├─────────────────────────────────────────────────────────────────────────┤
+# │  Rule C (SCHEMA_DRIFT) now runs a      "response schema changed" is    │
+# │  property-level walker instead of a    not actionable on its own.      │
+# │  whole-object serialised comparison.   A developer still has to open   │
+# │  Findings include                      both specs to know what         │
+# │  response_schema_changes and           changed. Field-level output     │
+# │  request_body_schema_changes: lists    makes the finding self-         │
+# │  of added/removed fields, type         contained and immediately       │
+# │  changes, and required promotions.     actionable.                     │
+# └─────────────────────────────────────────────────────────────────────────┘
 #
 # CHANGELOG (v2 → v3):
 # ┌─────────────────────────────────────────────────────────────────────────┐
@@ -286,6 +300,94 @@ def _serialise_params(params: list) -> str:
     return json.dumps(params, sort_keys=True, separators=(",", ":"))
 
 
+def _extract_json_schema(holder: dict) -> dict:
+    """[Navigate holder → content → application/json → schema.
+        Works for both a response object and a requestBody object.]"""
+    if not isinstance(holder, dict):
+        return {}
+    content = holder.get("content") or {}
+    if not isinstance(content, dict):
+        return {}
+    media = content.get("application/json") or next(iter(content.values()), {})
+    if not isinstance(media, dict):
+        return {}
+    schema = media.get("schema") or {}
+    return schema if isinstance(schema, dict) else {}
+
+
+def _get_primary_response_schema(responses: dict) -> dict:
+    """[Select the primary success response schema from a `responses` dict.
+        Preference order: 200 → 201 → 202 → first 2xx → first response.]"""
+    if not isinstance(responses, dict):
+        return {}
+    for code in ("200", "201", "202"):
+        if code in responses:
+            return _extract_json_schema(responses[code])
+    for code, resp in responses.items():
+        if str(code).startswith("2"):
+            return _extract_json_schema(resp)
+    first = next(iter(responses.values()), {})
+    return _extract_json_schema(first)
+
+
+def _diff_schema_properties(v1_schema: dict, v2_schema: dict) -> list:
+    """[Compare two OpenAPI schema objects at the properties level.
+        Returns a list of change dicts:
+          field_removed   — field present in V1 but absent in V2
+          field_added     — field absent in V1 but present in V2
+          type_changed    — field exists in both; `type` key differs
+          became_required — field promoted from optional to required
+          became_optional — field demoted from required to optional
+        Required changes are only reported for fields that exist in both
+        versions — not for fields that were simultaneously added or removed.]"""
+    if not isinstance(v1_schema, dict) or not isinstance(v2_schema, dict):
+        return []
+
+    v1_props: dict = v1_schema.get("properties") or {}
+    v2_props: dict = v2_schema.get("properties") or {}
+    if not isinstance(v1_props, dict):
+        v1_props = {}
+    if not isinstance(v2_props, dict):
+        v2_props = {}
+
+    v1_required: set = set(v1_schema.get("required") or [])
+    v2_required: set = set(v2_schema.get("required") or [])
+
+    changes: list = []
+
+    for field in sorted(set(v1_props) | set(v2_props)):
+        in_v1 = field in v1_props
+        in_v2 = field in v2_props
+
+        if in_v1 and not in_v2:
+            changes.append({"field": field, "change": "field_removed"})
+        elif in_v2 and not in_v1:
+            changes.append({"field": field, "change": "field_added"})
+        else:
+            v1_def  = v1_props[field]
+            v2_def  = v2_props[field]
+            v1_type = v1_def.get("type") if isinstance(v1_def, dict) else None
+            v2_type = v2_def.get("type") if isinstance(v2_def, dict) else None
+            if v1_type != v2_type and (v1_type is not None or v2_type is not None):
+                changes.append({
+                    "field":     field,
+                    "change":    "type_changed",
+                    "from_type": v1_type or "unknown",
+                    "to_type":   v2_type or "unknown",
+                })
+
+    # [Required promotions — only for fields shared between both versions.]
+    shared: set = set(v1_props) & set(v2_props)
+    for field in sorted(v2_required - v1_required):
+        if field in shared:
+            changes.append({"field": field, "change": "became_required"})
+    for field in sorted(v1_required - v2_required):
+        if field in shared:
+            changes.append({"field": field, "change": "became_optional"})
+
+    return changes
+
+
 def _find_modified_endpoints(v1_contracts: dict, v2_contracts: dict) -> list:
     """
     [Phase 2 — intersection analysis on shared contracts.
@@ -399,21 +501,21 @@ def _find_modified_endpoints(v1_contracts: dict, v2_contracts: dict) -> list:
 
         # ── RULE C — SCHEMA_DRIFT (MEDIUM) ────────────────────────────────────
 
-        # [Compare the serialised `responses` and `requestBody` objects between
-        #  V1 and V2. These hold the actual data shapes the endpoint exchanges
-        #  with clients — a change here is a contract break even when the
-        #  endpoint URL and parameters are unchanged.
-        #
-        #  json.dumps with sort_keys=True gives a canonical string that is
-        #  independent of key-ordering variation between spec authors or tooling,
-        #  preventing false positives from cosmetic reformatting.]
-        v1_responses    = json.dumps(v1_op.get("responses",    {}), sort_keys=True)
-        v2_responses    = json.dumps(v2_op.get("responses",    {}), sort_keys=True)
-        v1_request_body = json.dumps(v1_op.get("requestBody",  {}), sort_keys=True)
-        v2_request_body = json.dumps(v2_op.get("requestBody",  {}), sort_keys=True)
+        # [Fast path: serialised whole-object comparison. If nothing changed,
+        #  skip the property-level walk entirely — the common case stays O(1).]
+        v1_responses_dict    = v1_op.get("responses",   {}) or {}
+        v2_responses_dict    = v2_op.get("responses",   {}) or {}
+        v1_request_body_dict = v1_op.get("requestBody", {}) or {}
+        v2_request_body_dict = v2_op.get("requestBody", {}) or {}
 
-        responses_drifted    = v1_responses    != v2_responses
-        request_body_drifted = v1_request_body != v2_request_body
+        responses_drifted = (
+            json.dumps(v1_responses_dict,    sort_keys=True) !=
+            json.dumps(v2_responses_dict,    sort_keys=True)
+        )
+        request_body_drifted = (
+            json.dumps(v1_request_body_dict, sort_keys=True) !=
+            json.dumps(v2_request_body_dict, sort_keys=True)
+        )
 
         if responses_drifted or request_body_drifted:
             drifted_parts = []
@@ -423,16 +525,35 @@ def _find_modified_endpoints(v1_contracts: dict, v2_contracts: dict) -> list:
                 drifted_parts.append("response schema")
             drifted_str = " and ".join(drifted_parts)
 
+            # [Property-level granular diff — walk each schema's `properties`
+            #  to surface added/removed fields, type changes, and required
+            #  promotions. Attached to the finding so the Jinja2 renderer
+            #  can display a self-contained, actionable change list.]
+            resp_changes: list = []
+            req_changes:  list = []
+
+            if responses_drifted:
+                v1_resp_schema = _get_primary_response_schema(v1_responses_dict)
+                v2_resp_schema = _get_primary_response_schema(v2_responses_dict)
+                resp_changes   = _diff_schema_properties(v1_resp_schema, v2_resp_schema)
+
+            if request_body_drifted:
+                v1_req_schema = _extract_json_schema(v1_request_body_dict)
+                v2_req_schema = _extract_json_schema(v2_request_body_dict)
+                req_changes   = _diff_schema_properties(v1_req_schema, v2_req_schema)
+
             findings.append({
-                "signature":   signature,
-                "method":      method,
-                "path":        path,
-                "severity":    "MEDIUM",
-                "change_type": "SCHEMA_DRIFT",
-                "description": (
+                "signature":                   signature,
+                "method":                      method,
+                "path":                        path,
+                "severity":                    "MEDIUM",
+                "change_type":                 "SCHEMA_DRIFT",
+                "description":                 (
                     f"The {drifted_str} changed between versions. "
                     "Clients that depend on the previous data shape may break."
                 ),
+                "response_schema_changes":     resp_changes,
+                "request_body_schema_changes": req_changes,
             })
             continue
 

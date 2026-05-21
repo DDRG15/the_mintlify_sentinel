@@ -16,6 +16,9 @@ from judge_diff import (
     _find_removed_endpoints,
     _find_modified_endpoints,
     _combine_and_sort,
+    _extract_json_schema,
+    _get_primary_response_schema,
+    _diff_schema_properties,
 )
 
 
@@ -391,3 +394,181 @@ class TestEdgeCases:
         findings = run_diff(baseline, target)
         assert len(findings) > 0
         assert all(f["severity"] == "CRITICAL" for f in findings)
+
+
+# ---------------------------------------------------------------------------
+# Schema helpers — unit tests for _diff_schema_properties
+# ---------------------------------------------------------------------------
+
+class TestSchemaHelpers:
+
+    def test_field_removed(self):
+        v1 = {"properties": {"id": {"type": "string"}, "name": {"type": "string"}}}
+        v2 = {"properties": {"id": {"type": "string"}}}
+        changes = _diff_schema_properties(v1, v2)
+        assert {"field": "name", "change": "field_removed"} in changes
+
+    def test_field_added(self):
+        v1 = {"properties": {"id": {"type": "string"}}}
+        v2 = {"properties": {"id": {"type": "string"}, "email": {"type": "string"}}}
+        changes = _diff_schema_properties(v1, v2)
+        assert {"field": "email", "change": "field_added"} in changes
+
+    def test_type_changed(self):
+        v1 = {"properties": {"id": {"type": "string"}}}
+        v2 = {"properties": {"id": {"type": "integer"}}}
+        changes = _diff_schema_properties(v1, v2)
+        assert changes == [{"field": "id", "change": "type_changed",
+                             "from_type": "string", "to_type": "integer"}]
+
+    def test_became_required(self):
+        v1 = {"properties": {"id": {"type": "string"}, "email": {"type": "string"}},
+              "required": ["id"]}
+        v2 = {"properties": {"id": {"type": "string"}, "email": {"type": "string"}},
+              "required": ["id", "email"]}
+        changes = _diff_schema_properties(v1, v2)
+        assert {"field": "email", "change": "became_required"} in changes
+
+    def test_became_optional(self):
+        v1 = {"properties": {"id": {"type": "string"}}, "required": ["id"]}
+        v2 = {"properties": {"id": {"type": "string"}}}
+        changes = _diff_schema_properties(v1, v2)
+        assert {"field": "id", "change": "became_optional"} in changes
+
+    def test_identical_schema_returns_empty(self):
+        schema = {"properties": {"id": {"type": "string"}}, "required": ["id"]}
+        assert _diff_schema_properties(schema, schema) == []
+
+    def test_no_properties_returns_empty(self):
+        assert _diff_schema_properties({"type": "string"}, {"type": "integer"}) == []
+
+    def test_empty_schemas_return_empty(self):
+        assert _diff_schema_properties({}, {}) == []
+
+    def test_non_dict_input_returns_empty(self):
+        assert _diff_schema_properties(None, {}) == []
+        assert _diff_schema_properties({}, None) == []
+
+    def test_required_only_reported_for_shared_fields(self):
+        # field added to V2 AND listed as required — should produce field_added, not became_required
+        v1 = {"properties": {"id": {"type": "string"}}}
+        v2 = {"properties": {"id": {"type": "string"}, "email": {"type": "string"}},
+              "required": ["email"]}
+        changes = _diff_schema_properties(v1, v2)
+        change_types = [c["change"] for c in changes]
+        assert "became_required" not in change_types
+        assert "field_added" in change_types
+
+    def test_extract_json_schema_gets_application_json(self):
+        holder = {"content": {"application/json": {"schema": {"type": "object"}}}}
+        assert _extract_json_schema(holder) == {"type": "object"}
+
+    def test_extract_json_schema_returns_empty_for_missing(self):
+        assert _extract_json_schema({}) == {}
+        assert _extract_json_schema({"content": {}}) == {}
+
+    def test_get_primary_response_schema_prefers_200(self):
+        responses = {
+            "404": {"content": {"application/json": {"schema": {"type": "string"}}}},
+            "200": {"content": {"application/json": {"schema": {"type": "object"}}}},
+        }
+        schema = _get_primary_response_schema(responses)
+        assert schema == {"type": "object"}
+
+
+# ---------------------------------------------------------------------------
+# Granular schema diff — field-level assertions on SCHEMA_DRIFT findings
+# ---------------------------------------------------------------------------
+
+class TestGranularSchemaDiff:
+
+    def _resp_op(self, props, required=None):
+        schema = {"type": "object", "properties": props}
+        if required:
+            schema["required"] = required
+        return {"responses": {"200": {"content": {"application/json": {"schema": schema}}}}}
+
+    def _req_op(self, props, required=None):
+        schema = {"type": "object", "properties": props}
+        if required:
+            schema["required"] = required
+        return {"requestBody": {"content": {"application/json": {"schema": schema}}}}
+
+    def test_field_removed_in_response_schema_changes(self):
+        v1_op = self._resp_op({"id": {"type": "string"}, "name": {"type": "string"}})
+        v2_op = self._resp_op({"id": {"type": "string"}})
+        v1 = extract_contracts(_make_spec({"/users": {"get": v1_op}}))
+        v2 = extract_contracts(_make_spec({"/users": {"get": v2_op}}))
+        findings = _find_modified_endpoints(v1, v2)
+        sc = findings[0]["response_schema_changes"]
+        assert any(c["field"] == "name" and c["change"] == "field_removed" for c in sc)
+
+    def test_field_added_in_response_schema_changes(self):
+        v1_op = self._resp_op({"id": {"type": "string"}})
+        v2_op = self._resp_op({"id": {"type": "string"}, "email": {"type": "string"}})
+        v1 = extract_contracts(_make_spec({"/users": {"get": v1_op}}))
+        v2 = extract_contracts(_make_spec({"/users": {"get": v2_op}}))
+        findings = _find_modified_endpoints(v1, v2)
+        sc = findings[0]["response_schema_changes"]
+        assert any(c["field"] == "email" and c["change"] == "field_added" for c in sc)
+
+    def test_type_changed_in_response_schema_changes(self):
+        v1_op = self._resp_op({"id": {"type": "string"}})
+        v2_op = self._resp_op({"id": {"type": "integer"}})
+        v1 = extract_contracts(_make_spec({"/users": {"get": v1_op}}))
+        v2 = extract_contracts(_make_spec({"/users": {"get": v2_op}}))
+        findings = _find_modified_endpoints(v1, v2)
+        sc = findings[0]["response_schema_changes"]
+        assert len(sc) == 1
+        assert sc[0]["field"] == "id"
+        assert sc[0]["change"] == "type_changed"
+        assert sc[0]["from_type"] == "string"
+        assert sc[0]["to_type"] == "integer"
+
+    def test_became_required_in_response_schema_changes(self):
+        v1_op = self._resp_op({"id": {"type": "string"}, "email": {"type": "string"}})
+        v2_op = self._resp_op({"id": {"type": "string"}, "email": {"type": "string"}},
+                               required=["email"])
+        v1 = extract_contracts(_make_spec({"/users": {"get": v1_op}}))
+        v2 = extract_contracts(_make_spec({"/users": {"get": v2_op}}))
+        findings = _find_modified_endpoints(v1, v2)
+        sc = findings[0]["response_schema_changes"]
+        assert any(c["field"] == "email" and c["change"] == "became_required" for c in sc)
+
+    def test_became_optional_in_response_schema_changes(self):
+        v1_op = self._resp_op({"id": {"type": "string"}}, required=["id"])
+        v2_op = self._resp_op({"id": {"type": "string"}})
+        v1 = extract_contracts(_make_spec({"/users": {"get": v1_op}}))
+        v2 = extract_contracts(_make_spec({"/users": {"get": v2_op}}))
+        findings = _find_modified_endpoints(v1, v2)
+        sc = findings[0]["response_schema_changes"]
+        assert any(c["field"] == "id" and c["change"] == "became_optional" for c in sc)
+
+    def test_request_body_field_removed_in_schema_changes(self):
+        v1_op = self._req_op({"name": {"type": "string"}, "email": {"type": "string"}})
+        v2_op = self._req_op({"name": {"type": "string"}})
+        v1 = extract_contracts(_make_spec({"/users": {"post": v1_op}}))
+        v2 = extract_contracts(_make_spec({"/users": {"post": v2_op}}))
+        findings = _find_modified_endpoints(v1, v2)
+        rb = findings[0]["request_body_schema_changes"]
+        assert any(c["field"] == "email" and c["change"] == "field_removed" for c in rb)
+
+    def test_no_properties_gives_empty_schema_changes(self):
+        v1_op = {"responses": {"200": {"content": {"application/json":
+                     {"schema": {"type": "string"}}}}}}
+        v2_op = {"responses": {"200": {"content": {"application/json":
+                     {"schema": {"type": "integer"}}}}}}
+        v1 = extract_contracts(_make_spec({"/ping": {"get": v1_op}}))
+        v2 = extract_contracts(_make_spec({"/ping": {"get": v2_op}}))
+        findings = _find_modified_endpoints(v1, v2)
+        assert findings[0]["change_type"] == "SCHEMA_DRIFT"
+        assert findings[0]["response_schema_changes"] == []
+
+    def test_schema_drift_finding_always_has_both_change_keys(self):
+        v1_op = self._resp_op({"id": {"type": "string"}})
+        v2_op = self._resp_op({"id": {"type": "integer"}})
+        v1 = extract_contracts(_make_spec({"/users": {"get": v1_op}}))
+        v2 = extract_contracts(_make_spec({"/users": {"get": v2_op}}))
+        findings = _find_modified_endpoints(v1, v2)
+        assert "response_schema_changes" in findings[0]
+        assert "request_body_schema_changes" in findings[0]

@@ -20,6 +20,22 @@ The following API contract changes were detected in the OpenAPI specification. R
 `{{ change.signature }}`
 
 {{ change.description }}
+{% if change.change_type == "SCHEMA_DRIFT" %}
+{% if change.response_schema_changes %}
+
+**Response schema field changes:**
+{% for sc in change.response_schema_changes %}
+- `{{ sc.field }}` — {% if sc.change == "field_removed" %}field removed{% elif sc.change == "field_added" %}field added{% elif sc.change == "type_changed" %}type changed `{{ sc.from_type }}` → `{{ sc.to_type }}`{% elif sc.change == "became_required" %}became required{% elif sc.change == "became_optional" %}became optional{% endif %}
+{% endfor %}
+{% endif %}
+{% if change.request_body_schema_changes %}
+
+**Request body schema field changes:**
+{% for sc in change.request_body_schema_changes %}
+- `{{ sc.field }}` — {% if sc.change == "field_removed" %}field removed{% elif sc.change == "field_added" %}field added{% elif sc.change == "type_changed" %}type changed `{{ sc.from_type }}` → `{{ sc.to_type }}`{% elif sc.change == "became_required" %}became required{% elif sc.change == "became_optional" %}became optional{% endif %}
+{% endfor %}
+{% endif %}
+{% endif %}
 {% if change.severity == "CRITICAL" %}
 </Danger>
 {% elif change.severity == "MEDIUM" %}

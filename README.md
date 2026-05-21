@@ -39,7 +39,7 @@ target-openapi.json  ───┘                                  │
 |-------|--------------|------------|-----------------|
 | CRITICAL | Endpoint deleted | Every client calling that route | `<Danger>` |
 | MEDIUM | Parameters changed | Clients using removed / renamed params | `<Warning>` |
-| MEDIUM | Response or request body schema changed | Clients relying on the previous data shape | `<Warning>` |
+| MEDIUM | Response or request body schema changed (field added/removed, type changed, required promotion) | Clients relying on the previous data shape | `<Warning>` |
 | LOW | Summary or description text changed | Nobody — zero runtime impact | `<Info>` |
 
 ---
@@ -115,7 +115,7 @@ pytest tests/ -v
 pytest tests/ -v --cov=scripts --cov-report=term-missing
 ```
 
-74 tests across 4 modules: `test_judge_config`, `test_judge_diff`, `test_architect_render`, `test_notifier`. Covers all three severity tiers, edge cases (empty spec, malformed JSON, vendor extension keys), webhook HTTP success/failure paths, and integration tests against the real fixture files. A session fixture in `conftest.py` preserves `output/changelog.mdx` across test runs.
+95 tests across 4 modules: `test_judge_config`, `test_judge_diff`, `test_architect_render`, `test_notifier`. Covers all three severity tiers, edge cases (empty spec, malformed JSON, vendor extension keys), webhook HTTP success/failure paths, field-level schema diff assertions, and integration tests against the real fixture files. A session fixture in `conftest.py` preserves `output/changelog.mdx` across test runs.
 
 ---
 

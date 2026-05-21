@@ -1,6 +1,6 @@
 # Next Session
 
-## Current state: v1.1 — shipped
+## Current state: v1.2 — shipped
 
 Everything below is done. See `docs/ROADMAP.md` for the full priority list.
 
@@ -43,17 +43,16 @@ Then add the CI badge to README.md:
 
 ---
 
-## Option C — Granular schema diff (Priority 1 from ROADMAP)
+## Option C — Version history (Priority 2 from ROADMAP)
 
-Instead of "response schema changed", tell the developer *exactly* what changed:
-field additions, removals, type changes, required field promotions.
+Track diff results across multiple runs. Surface trends: which endpoints change
+most often, which are stable, how many findings per release.
 
 Files:
-- `scripts/judge_diff.py` — replace serialised-diff check with recursive property walker
-- `templates/changelog.mdx.jinja` — add field-level sub-list inside the `<Warning>` callout
-- `tests/test_judge_diff.py` — add field-level assertions
+- `scripts/historian.py` (new) — append findings to `output/history.json`
+- `app.py` — add a "History" tab showing a table of past runs
 
-Estimated: 3–4 hours.
+Estimated: 1 day.
 
 ---
 
@@ -78,3 +77,4 @@ Estimated: 3–4 hours.
 - [x] YAML OpenAPI spec support (auto-detects by content, not extension)
 - [x] Schema drift detection — SCHEMA_DRIFT MEDIUM (response + request body)
 - [x] ROADMAP.md — full prioritized backlog
+- [x] Granular schema diff — field-level changes in SCHEMA_DRIFT findings (v1.2, 95 tests)
