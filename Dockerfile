@@ -45,6 +45,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application source (respects .dockerignore — no tests, no .git, no output)
 COPY . .
 
+# output/ is excluded by .dockerignore (generated files) but the directory
+# must exist so the renderer can write changelog.mdx at runtime.
+RUN mkdir -p /app/output
+
 # Default command: run the full 4-stage pipeline with bundled input fixtures.
 # Override by passing arguments after the image name:
 #   docker run --rm mintlify-sentinel python main.py --baseline ...
