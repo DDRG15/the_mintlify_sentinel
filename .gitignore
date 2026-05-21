@@ -37,6 +37,7 @@ output/*.mdx
 output/*.pdf
 output/*.html
 output/*.bak
+output/history.json
 
 # Secrets / environment config
 .env

@@ -1,7 +1,7 @@
 # The Mintlify Sentinel — Roadmap
 
 > Last updated: 2026-05-21
-> Current version: v1.2 (granular schema diff)
+> Current version: v1.3 (version history)
 
 ---
 
@@ -31,18 +31,9 @@ Field-level diff is live. SCHEMA_DRIFT findings now include `response_schema_cha
 
 ---
 
-### Priority 2 — Version history (v1.3)
+### ~~Priority 2 — Version history (v1.3)~~ ✅ SHIPPED
 
-**What:** Track and store diff results across multiple release pairs. Surface trends: which endpoints change most often, which are stable, how many findings per release.
-
-**Why it matters:** The current tool is stateless — each run is independent. Version history turns it into a continuous monitoring tool rather than a point-in-time check.
-
-**Where to build it:**
-- `scripts/historian.py` (new) — append findings to a JSON or SQLite store keyed by timestamp + spec pair
-- `app.py` — add a "History" tab showing a table of past runs
-- `output/history.json` (new) — flat file store (no database dependency)
-
-**Estimated effort:** 1 day
+History tracking is live. Every pipeline run (CLI and UI) is appended to `output/history.json`. The Streamlit UI has a new **History** tab: summary metrics, a full runs table, and a drill-down selectbox to review findings from any past run.
 
 ---
 

@@ -18,6 +18,7 @@ from judge_diff       import run_diff
 from architect_render import render_changelog
 from judge_config     import validate_docs_config
 from notifier         import notify
+from historian        import append_run, load_history
 
 
 # =============================================================================
@@ -108,7 +109,7 @@ st.divider()
 # TABS
 # =============================================================================
 
-tab_run, tab_validate = st.tabs(["Run Sentinel", "Validate Config"])
+tab_run, tab_validate, tab_history = st.tabs(["Run Sentinel", "Validate Config", "History"])
 
 
 # =============================================================================
@@ -176,6 +177,8 @@ with tab_run:
                         slack_url=slack_url,
                         discord_url=discord_url,
                     )
+
+                append_run(findings, baseline_file.name, target_file.name)
 
             st.session_state["findings"]     = findings
             st.session_state["last_run"]     = datetime.now().strftime("%H:%M:%S")
@@ -316,3 +319,82 @@ with tab_validate:
                 st.error(f"Validation error: {exc}")
             finally:
                 os.unlink(config_path)
+
+
+# =============================================================================
+# TAB 3 — HISTORY
+# =============================================================================
+
+with tab_history:
+    st.markdown("#### Run History")
+    st.markdown(
+        "Every pipeline run is recorded here automatically. "
+        "Use it to track which endpoints have been breaking across releases."
+    )
+
+    history = load_history()
+
+    if not history:
+        st.info(
+            "No runs recorded yet. Upload two specs and click **Run Sentinel** "
+            "to populate history."
+        )
+    else:
+        clean_runs = sum(1 for r in history if r["total"] == 0)
+        total_findings = sum(r["total"] for r in history)
+
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("Total runs",    len(history))
+        c2.metric("Total findings", total_findings)
+        c3.metric("🔴 Total critical", sum(r["critical"] for r in history))
+        c4.metric("✅ Clean runs",  clean_runs)
+
+        st.markdown("")
+
+        table_rows = [
+            {
+                "Timestamp": r["timestamp"],
+                "Baseline":  r["baseline"],
+                "Target":    r["target"],
+                "Total":     r["total"],
+                "🔴 Critical": r["critical"],
+                "🟡 Medium":   r["medium"],
+                "🔵 Low":      r["low"],
+            }
+            for r in history
+        ]
+        st.dataframe(table_rows, use_container_width=True, hide_index=True)
+
+        st.markdown("")
+        st.markdown("**Drill into a run**")
+
+        run_labels = [
+            f"{r['timestamp']}  ·  {r['baseline']} vs {r['target']}  "
+            f"({r['total']} finding{'s' if r['total'] != 1 else ''})"
+            for r in history
+        ]
+        selected_idx = st.selectbox(
+            "Select run",
+            range(len(run_labels)),
+            format_func=lambda i: run_labels[i],
+            label_visibility="collapsed",
+        )
+
+        selected = history[selected_idx]
+
+        if not selected["findings"]:
+            st.success("No findings in this run. API surface was stable.")
+        else:
+            for f in selected["findings"]:
+                sev       = f.get("severity", "LOW")
+                sig       = f.get("signature", "")
+                ctype     = f.get("change_type", "")
+                desc      = f.get("description", "")
+                card_body = f"**{ctype}** — `{sig}`\n\n{desc}"
+
+                if sev == "CRITICAL":
+                    st.error(f"🔴 {card_body}")
+                elif sev == "MEDIUM":
+                    st.warning(f"🟡 {card_body}")
+                else:
+                    st.info(f"🔵 {card_body}")

@@ -1,6 +1,6 @@
 # Next Session
 
-## Current state: v1.2 — shipped
+## Current state: v1.3 — shipped
 
 Everything below is done. See `docs/ROADMAP.md` for the full priority list.
 
@@ -43,16 +43,17 @@ Then add the CI badge to README.md:
 
 ---
 
-## Option C — Version history (Priority 2 from ROADMAP)
+## Option C — Push to GitHub + CI badge (Priority 3 from ROADMAP)
 
-Track diff results across multiple runs. Surface trends: which endpoints change
-most often, which are stable, how many findings per release.
+The repo is clean. No webhook URLs anywhere. 15 minutes.
 
-Files:
-- `scripts/historian.py` (new) — append findings to `output/history.json`
-- `app.py` — add a "History" tab showing a table of past runs
-
-Estimated: 1 day.
+1. Create a new repo at github.com
+2. Add remote and push:
+```bash
+git remote add origin https://github.com/DDRG15/the-mintlify-sentinel.git
+git push -u origin main
+```
+3. Add badge to README.md once CI runs green.
 
 ---
 
@@ -78,3 +79,4 @@ Estimated: 1 day.
 - [x] Schema drift detection — SCHEMA_DRIFT MEDIUM (response + request body)
 - [x] ROADMAP.md — full prioritized backlog
 - [x] Granular schema diff — field-level changes in SCHEMA_DRIFT findings (v1.2, 95 tests)
+- [x] Version history — historian.py + History tab in Streamlit UI (v1.3)

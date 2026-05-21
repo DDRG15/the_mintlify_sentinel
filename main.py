@@ -96,6 +96,7 @@ try:
     from judge_diff       import run_diff              # STEP 2 — returns list
     from architect_render import render_changelog      # STEP 3 — returns None
     from notifier         import notify                # STEP 4b — optional notifications
+    from historian        import append_run as _record_run  # history store
 except ImportError as exc:
     # [Surface the exact Python error message so the engineer can distinguish
     #  between a file that is simply absent and a file that exists but fails
@@ -213,6 +214,7 @@ def run_pipeline(
     #  a clean diff gracefully (e.g. emit a "no changes this release" notice
     #  or write nothing). The orchestrator does not gate on list length here.]
     render_changelog(contract_findings)
+    _record_run(contract_findings, baseline_api_path, target_api_path)
 
     print("[orchestrator] ✓ STEP 3 COMPLETE — Changelog rendered.\n")
 

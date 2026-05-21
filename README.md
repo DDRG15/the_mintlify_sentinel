@@ -59,7 +59,7 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
-Opens at `http://localhost:8501`. Upload two OpenAPI specs, click **Run Sentinel**, and see findings as colored cards. Slack and Discord webhook URLs can be entered in the sidebar — notifications fire automatically after each run. A second tab runs the docs.json validator in isolation. A collapsible pipeline log shows the full stage output after each run.
+Opens at `http://localhost:8501`. Upload two OpenAPI specs, click **Run Sentinel**, and see findings as colored cards. Slack and Discord webhook URLs can be entered in the sidebar — notifications fire automatically after each run. A second tab runs the docs.json validator in isolation. A third **History** tab shows every past run with a drill-down into findings. A collapsible pipeline log shows the full stage output after each run.
 
 ---
 
@@ -173,6 +173,7 @@ the_mintlify_sentinel/
     judge_diff.py                 Stage 2: semantic diff engine
     architect_render.py           Stage 3: Jinja2 MDX renderer
     notifier.py                   Slack + Discord webhook dispatcher
+    historian.py                  Run history store (output/history.json)
     architect_pdf.py              PDF variant (optional, requires system deps)
   templates/
     changelog.mdx.jinja           Jinja2 template
