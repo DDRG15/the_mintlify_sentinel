@@ -1,42 +1,14 @@
 # Next Session
 
-## The Sentinel is feature-complete for v1.
+## Current state: v1.1 — shipped
 
-All planned work is done. Use this session for one of the following:
-
----
-
-## Option A — Push to GitHub
-
-The repo is clean and ready. No webhook URLs in any tracked file.
-
-1. Create a new repo at github.com (public or private — your call)
-2. Add the remote and push:
-
-```bash
-git remote add origin https://github.com/DDRG15/the-mintlify-sentinel.git
-git push -u origin main
-```
-
-GitHub Actions will trigger automatically and run the full test suite + pipeline.
+Everything below is done. See `docs/ROADMAP.md` for the full priority list.
 
 ---
 
-## Option B — Schema Drift Detection (next feature)
+## Option A — Try the UI (5 min)
 
-Extend the diff engine beyond endpoint-level changes to catch response
-body schema mutations: field type changes, required field additions, etc.
-
-Files to modify:
-- `scripts/judge_diff.py` — add Phase 3: response schema comparison
-- `tests/test_judge_diff.py` — extend with schema drift test cases
-- `templates/changelog.mdx.jinja` — no changes needed (severity system handles it)
-
----
-
-## Option C — Try the UI
-
-If you haven't tested the Streamlit UI yet:
+If you haven't opened the browser UI yet:
 
 ```bash
 streamlit run app.py
@@ -50,14 +22,49 @@ Expected: 6 red CRITICAL cards, download button, pipeline log expander.
 
 ---
 
-## Completed — v1.0
+## Option B — Push to GitHub (15 min)
+
+The repo is clean. No webhook URLs in any tracked file. Safe to push at any time.
+
+1. Create a new repo at github.com (public or private)
+2. Add the remote and push:
+
+```bash
+git remote add origin https://github.com/DDRG15/the-mintlify-sentinel.git
+git push -u origin main
+```
+
+GitHub Actions triggers automatically — runs the full 74-test suite + pipeline.
+
+Then add the CI badge to README.md:
+```
+![CI](https://github.com/DDRG15/the-mintlify-sentinel/actions/workflows/sentinel.yml/badge.svg)
+```
+
+---
+
+## Option C — Granular schema diff (Priority 1 from ROADMAP)
+
+Instead of "response schema changed", tell the developer *exactly* what changed:
+field additions, removals, type changes, required field promotions.
+
+Files:
+- `scripts/judge_diff.py` — replace serialised-diff check with recursive property walker
+- `templates/changelog.mdx.jinja` — add field-level sub-list inside the `<Warning>` callout
+- `tests/test_judge_diff.py` — add field-level assertions
+
+Estimated: 3–4 hours.
+
+---
+
+## Completed — v1.0 → v1.1
 
 - [x] requirements.txt
 - [x] Template bug fix (severity-conditional callouts)
 - [x] argparse CLI flags
 - [x] Step label fix (STEP 4/4)
 - [x] Circular import fix
-- [x] 68 tests — judge_config, judge_diff, architect_render, notifier
+- [x] 74 tests — judge_config, judge_diff, architect_render, notifier
 - [x] conftest.py — test isolation for output/changelog.mdx
 - [x] Slack + Discord webhook notifier
 - [x] README.md (GitHub, layperson, semi-tech, pitch)
@@ -68,3 +75,6 @@ Expected: 6 red CRITICAL cards, download button, pipeline log expander.
 - [x] Slack live test — HTTP 200
 - [x] Docker live test — exits 0
 - [x] Streamlit UI — all 4 phases (core, webhooks, validator tab, polish)
+- [x] YAML OpenAPI spec support (auto-detects by content, not extension)
+- [x] Schema drift detection — SCHEMA_DRIFT MEDIUM (response + request body)
+- [x] ROADMAP.md — full prioritized backlog
