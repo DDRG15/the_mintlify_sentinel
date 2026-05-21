@@ -1,6 +1,6 @@
 # Streamlit UI — Implementation Record
 
-> **Status: COMPLETE.** All four phases shipped. `app.py` is live at `http://localhost:8501`.
+> **Status: COMPLETE.** All five phases shipped. `app.py` is live at `http://localhost:8501`.
 
 ---
 
@@ -51,6 +51,18 @@ A browser interface for the Sentinel pipeline. A user opens the page, uploads tw
 - Collapsible **Pipeline log** expander — shows full stdout from all 4 stages
 - Collapsible **Raw JSON findings** expander — structured view for developers
 - Sidebar pipeline stage table
+
+---
+
+## Phase 5 — Version History Tab ✓
+
+- Third tab: "History"
+- `load_history()` called on every tab render — no stale state
+- Summary metrics row: total runs, total findings, total critical, clean runs
+- `st.dataframe` table of all runs: timestamp, baseline, target, finding counts per tier
+- `st.selectbox` drill-down: select any past run, see its finding cards
+- `historian.append_run()` called in the Run Sentinel tab after each pipeline execution
+- `output/history.json` gitignored — machine-local, never committed
 
 ---
 

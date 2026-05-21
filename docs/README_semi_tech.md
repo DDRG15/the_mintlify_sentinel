@@ -1,49 +1,118 @@
 # The Mintlify Sentinel — Overview for the Technically Curious
 
-## What This Tool Does
+## What it does
 
-The Sentinel is a tool that compares two versions of an API specification file and generates a formatted report of everything that changed between them.
+The Sentinel is an automated API contract auditing tool. You give it two versions of an OpenAPI specification — the current version and the proposed new one — and it identifies every change between them, ranked by severity. The output is a formatted report ready to publish to a Mintlify documentation site.
 
-An API specification is a document — written in a standard format called OpenAPI — that describes exactly how a software service works: what features it has, how you call them, and what you get back. When that document changes, some of those changes are harmless. Others break every application that was relying on the old behavior.
+It works from a browser or a command line. Results arrive in about 10 seconds.
 
-The Sentinel automatically tells you which is which.
+---
 
-## Two Ways to Use It
+## Two ways to run it
 
-**Browser interface** — open a web page, upload two files, click a button. No terminal required. Results appear on screen as colored alert cards. You can download the report directly from the page and paste a Slack or Discord webhook URL in the sidebar to get a notification sent to your team automatically.
+**Browser interface**
+Run `streamlit run app.py`, open `http://localhost:8501`, upload two spec files (JSON or YAML), and click **Run Sentinel**. Results appear as color-coded finding cards. You can download the changelog file directly, enter Slack or Discord webhook URLs in the sidebar to fire notifications, and review past runs in the History tab — all without touching a terminal.
 
-**Command line** — a single `python main.py` command from a terminal. Supports flags for explicit file paths and webhook URLs. Integrates directly into CI/CD pipelines.
+**Command line**
+Run `python main.py` from the project folder. Accepts explicit file paths via flags (`--baseline`, `--target`). Webhook URLs can be passed as flags or set as environment variables. The formatted changelog is saved to `output/changelog.mdx`.
 
-Both produce the same output: a formatted MDX file ready to publish to your Mintlify documentation site.
+Both produce the same output.
 
-## How It Works (Without the Code)
+---
 
-You give it two files: the old version of the API spec and the new version. It runs them through a four-stage pipeline:
+## The four stages
 
-1. **Config validation (hard gate):** Checks that your Mintlify site config (`docs.json`) is structurally correct. If it's broken, the pipeline stops immediately — there's no point running a diff if the output will never render.
-2. **Semantic diff:** Looks for three types of changes between the two specs:
-   - **Critical:** A feature was completely removed. Every caller using it will get an error the moment the update goes live.
-   - **Medium:** The inputs a feature expects changed. Apps that were sending the old inputs will fail.
-   - **Low:** Only the description text changed. No functional impact — but worth reviewing.
-3. **Changelog rendering:** Produces a formatted MDX file using Mintlify's native callout components (`<Danger>`, `<Warning>`, `<Info>`). Commit it to your docs repo and it renders as a changelog page.
-4. **Audit gate:** Reports findings and exits. Never blocks a deployment — the decision to proceed is the engineer's.
+Every run goes through four stages in sequence:
+
+**Stage 1 — Config validation**
+Checks that your Mintlify site configuration file (`docs.json`) is structurally correct. If it's broken, the pipeline stops immediately. A misconfigured `docs.json` causes the entire Mintlify site build to fail, so there is no point running a diff whose output will never render.
+
+**Stage 2 — Semantic diff**
+Compares the two API specs and classifies every difference:
+
+| Severity | What it means |
+|----------|--------------|
+| **CRITICAL** | An endpoint that existed in V1 is gone in V2. Every caller will get an error on deployment. |
+| **MEDIUM (PARAMETERS_MODIFIED)** | The inputs an endpoint accepts have changed. |
+| **MEDIUM (SCHEMA_DRIFT)** | The data shape returned or accepted by an endpoint changed. The Sentinel tells you exactly which fields were added, removed, or had their types changed — not just that something changed. |
+| **LOW** | Only the description text was updated. Zero runtime impact. |
+
+One finding per endpoint — if an endpoint has both a parameter change and a schema change, only the higher-severity finding is reported.
+
+**Stage 3 — MDX rendering**
+A template converts the findings into a Mintlify-native MDX file using the correct callout components: `<Danger>` for CRITICAL, `<Warning>` for MEDIUM (with a field-level change sub-list), `<Info>` for LOW. Commit the file to your docs repo and it renders natively.
+
+**Stage 4 — Audit gate**
+Always exits with code 0. The Sentinel is an auditing tool, not a deployment blocker. The decision to proceed belongs to the engineer.
+
+---
+
+## What the Sentinel detects (with examples)
+
+| Change | Severity | What you see |
+|--------|----------|-------------|
+| Endpoint `DELETE /v1/users/{id}` removed | CRITICAL | "Endpoint existed in baseline but is absent in target" |
+| `limit` parameter removed from `GET /users` | MEDIUM | "Endpoint parameters were altered. V1=2 → V2=1 (-1)" |
+| `id` field changed from `string` to `integer` in response | MEDIUM | "response schema changed" + field sub-list: `id — type changed string → integer` |
+| `email` field added to required in request body | MEDIUM | "request body schema changed" + field sub-list: `email — became required` |
+| Summary text rewritten | LOW | "summary changed" |
+
+---
 
 ## Notifications
 
-After the pipeline runs, the Sentinel can send a formatted summary to Slack or Discord. The message includes the total finding count broken down by severity, plus one entry per finding. You supply the webhook URL — the Sentinel fires it automatically.
+After the pipeline runs, the Sentinel can send a formatted summary to Slack or Discord. Supply the webhook URL via `--slack-webhook`, `--discord-webhook`, or the environment variables `SLACK_WEBHOOK_URL` / `DISCORD_WEBHOOK_URL`. The message includes total finding counts by severity and one line per finding.
 
-## Why This Matters
+---
 
-Without a tool like this, breaking API changes are discovered by your users — not your team. A developer integrating with your API wakes up one morning to find their application throwing errors, traces it back to your last release, and files a support ticket (or just silently stops using your product).
+## History tab
 
-The Sentinel surfaces those changes before the release, not after.
+Every run is automatically recorded in `output/history.json`. The browser UI's History tab shows a table of all past runs (timestamp, spec filenames, finding counts by severity) and lets you click into any past run to review its individual findings. This turns the Sentinel from a point-in-time check into a continuous audit trail.
 
-## What It's Built On
+---
 
-- **Python 3.10+** — the programming language it's written in
-- **Pydantic v2** — validates that your Mintlify site config is structurally correct before the diff runs
-- **Jinja2** — a templating engine that formats findings into a ready-to-publish MDX document
-- **Streamlit** — the browser UI that wraps the pipeline in a web interface
-- **Mintlify** — the documentation platform the output is designed for
+## Supported formats and environments
 
-You don't need to know any of these to use the tool. You just need Python installed, one `pip install` command, and either a browser or a terminal.
+- OpenAPI 3.x — JSON or YAML (auto-detected from file content, not extension)
+- Python 3.10 or later
+- Docker — the full pipeline and the browser UI both run in a container
+- GitHub Actions CI — a pre-built workflow is included in `.github/workflows/sentinel.yml`
+
+---
+
+## Tech stack in plain terms
+
+| Tool | What it does in the Sentinel |
+|------|------------------------------|
+| Python 3.10+ | The core language — all pipeline logic is pure Python |
+| Pydantic v2 | Validates that `docs.json` matches the Mintlify schema |
+| Jinja2 | Converts the findings list into the MDX changelog file |
+| PyYAML | Parses YAML-format OpenAPI specs |
+| Streamlit 1.35 | Provides the browser interface |
+| pytest | 95 automated tests covering all pipeline stages |
+
+No database. No external services. No paid subscriptions.
+
+---
+
+## Quick start
+
+```bash
+# Install dependencies
+pip install -r requirements.txt
+
+# Run with the included example specs
+python main.py
+
+# Run with your own files
+python main.py --baseline path/to/v1.json --target path/to/v2.json
+
+# Run with Slack notification
+python main.py --slack-webhook https://hooks.slack.com/services/...
+
+# Open the browser UI
+streamlit run app.py
+
+# Run all tests
+pytest tests/ -v
+```

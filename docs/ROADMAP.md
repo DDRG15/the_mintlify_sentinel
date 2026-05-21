@@ -5,7 +5,7 @@
 
 ---
 
-## What's Shipped (v1.0 → v1.1)
+## What's Shipped (v1.0 → v1.3)
 
 | Feature | Status |
 |---------|--------|
@@ -20,6 +20,7 @@
 | YAML OpenAPI spec support | ✅ Done |
 | Schema drift detection (SCHEMA_DRIFT — MEDIUM) | ✅ Done |
 | Granular schema diff (field-level: added/removed/type/required) | ✅ Done |
+| Version history — historian.py + History tab in Streamlit UI | ✅ Done |
 
 ---
 
