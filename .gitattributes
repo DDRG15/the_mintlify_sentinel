@@ -1,0 +1,20 @@
+# Normalize line endings to LF in the repo, checkout as-is on all platforms
+* text=auto eol=lf
+
+# Force LF for these file types regardless of OS
+*.py    text eol=lf
+*.md    text eol=lf
+*.json  text eol=lf
+*.yml   text eol=lf
+*.yaml  text eol=lf
+*.jinja text eol=lf
+*.txt   text eol=lf
+*.sh    text eol=lf
+
+# Binary files — no line ending conversion
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.pdf   binary

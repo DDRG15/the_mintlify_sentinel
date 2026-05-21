@@ -1,0 +1,30 @@
+# The Mintlify Sentinel — Python dependencies
+# Pin to exact versions for reproducible CI builds.
+# Upgrade strategy: bump versions quarterly after testing.
+
+# --- Core pipeline dependencies ---
+
+# Pydantic v2: used by judge_config.py for docs.json schema validation.
+# v2.x is required (judge_config.py uses model_validate(), model_config, etc.).
+pydantic==2.7.4
+
+# Jinja2: used by architect_render.py for MDX changelog template rendering.
+jinja2==3.1.4
+
+# --- PDF rendering (architect_pdf.py) ---
+
+# Markdown: converts Markdown text to HTML before WeasyPrint processes it.
+markdown==3.6
+
+# WeasyPrint: renders HTML/CSS to PDF for the PDF changelog variant.
+# NOTE: requires libcairo2 + libpango system libraries (see Dockerfile).
+# Local install on Windows requires MSYS2/vcpkg; use Docker instead.
+weasyprint==62.3
+
+# --- Testing ---
+
+# pytest: test runner for the tests/ suite.
+pytest==8.2.2
+
+# pytest-cov: coverage reporting plugin.
+pytest-cov==5.0.0

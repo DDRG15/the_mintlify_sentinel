@@ -1,0 +1,36 @@
+---
+title: "API Changelog & Alerts"
+description: "Automated breaking change detection by The Mintlify Sentinel."
+---
+
+## Detected Breaking Changes
+
+{% if changes %}
+The following API contract changes were detected in the OpenAPI specification. Review carefully before deploying.
+
+{% for change in changes %}
+{% if change.severity == "CRITICAL" %}
+<Danger>
+{% elif change.severity == "MEDIUM" %}
+<Warning>
+{% else %}
+<Info>
+{% endif %}
+**{{ change.severity }} - {{ change.change_type }}**
+`{{ change.signature }}`
+
+{{ change.description }}
+{% if change.severity == "CRITICAL" %}
+</Danger>
+{% elif change.severity == "MEDIUM" %}
+</Warning>
+{% else %}
+</Info>
+{% endif %}
+
+{% endfor %}
+{% else %}
+<Check>
+No breaking changes detected. The API contract is intact.
+</Check>
+{% endif %}

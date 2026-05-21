@@ -1,0 +1,46 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Virtual environments — never copy into the image
+.venv/
+venv/
+env/
+
+# Tests — not needed at runtime
+tests/
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Git
+.git/
+.gitignore
+
+# Claude Code
+.claude/
+
+# Documentation source (private variants)
+docs/
+
+# Generated output — mounted as volumes at runtime
+output/
+
+# Secrets / env files
+.env
+.env.local
+secrets.json
+
+# CI config — not needed inside the container
+.github/
+
+# pytest / coverage artifacts
+.pytest_cache/
+.coverage
+htmlcov/
