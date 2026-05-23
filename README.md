@@ -6,6 +6,20 @@ This is not a diff tool that dumps JSON to a terminal. It is an audit pipeline w
 
 ---
 
+## Legal Disclaimer and Take-Down Notice
+
+This is an unofficial, non-commercial, educational project.
+
+1. **No Affiliation.** This repository and its creator are not affiliated with, endorsed by, sponsored by, or associated with Mintlify in any way.
+
+2. **Educational Purpose.** This codebase was built as a personal proof-of-concept to practice DevSecOps, containerization, Python scripting, and OpenAPI semantic diffing. The test fixtures used in this repository — `input/admin-openapi.json` and `input/analytics.openapi.json` — are Mintlify's publicly published API specifications, sourced from the `mintlify/docs` repository. The `docs.json` configuration follows the structure of Mintlify's publicly available starter kit. This project has absolutely zero commercial value.
+
+3. **License Compliance.** All Mintlify materials used as test fixtures in this project originate from MIT-licensed public repositories (`mintlify/docs`, `mintlify/starter`). The MIT license permits use, reproduction, and distribution. This project complies with those terms.
+
+4. **Take-Down Request.** If you are an authorized representative of Mintlify and wish for this repository to be modified or deleted, please open an Issue in this repository and I will comply immediately.
+
+---
+
 ## How It Works
 
 Four stages. One entry point. Ten seconds.
@@ -38,7 +52,7 @@ target-openapi.json  ───┘                                  │
 | Level | What Happened | Who Breaks | Mintlify Callout |
 |-------|--------------|------------|-----------------|
 | CRITICAL | Endpoint deleted | Every client calling that route | `<Danger>` |
-| MEDIUM | Parameters changed | Clients using removed / renamed params | `<Warning>` |
+| MEDIUM | Parameters changed | Clients using removed or renamed params | `<Warning>` |
 | MEDIUM | Response or request body schema changed (field added/removed, type changed, required promotion) | Clients relying on the previous data shape | `<Warning>` |
 | LOW | Summary or description text changed | Nobody — zero runtime impact | `<Info>` |
 
@@ -156,7 +170,7 @@ python scripts/architect_render.py      # render changelog from last diff
 the_mintlify_sentinel/
   main.py                         Master orchestrator (CLI entry point)
   app.py                          Streamlit browser UI
-  docs.json                       Mintlify site config
+  docs.json                       Mintlify site config (follows mintlify/starter structure)
   requirements.txt                Pinned Python dependencies
   Dockerfile
   .dockerignore
@@ -164,8 +178,8 @@ the_mintlify_sentinel/
   .gitattributes                  LF line ending normalization
   .env.example                    Webhook URL template (copy to .env)
   input/
-    admin-openapi.json            Baseline spec (V1)
-    analytics.openapi.json        Target spec (V2)
+    admin-openapi.json            Mintlify Admin API spec — baseline fixture (source: mintlify/docs)
+    analytics.openapi.json        Mintlify Analytics API spec — target fixture (source: mintlify/docs)
   output/
     changelog.mdx                 Generated MDX changelog
   scripts/
@@ -186,6 +200,7 @@ the_mintlify_sentinel/
   docs/
     README_layperson.md           Non-technical explanation
     README_semi_tech.md           Semi-technical overview
+    README_technical.md           Architecture reference
     README_pitch.md               Product pitch
     STREAMLIT_PLAN.md             UI implementation record
   .github/
