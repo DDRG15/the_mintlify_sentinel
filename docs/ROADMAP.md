@@ -54,11 +54,11 @@ History tracking is live. Every pipeline run (CLI and UI) is appended to `output
 
 ---
 
-### Priority 4 — React frontend (future, when client-facing)
+### Priority 4 — React frontend (future, if and when production-scale deployment is ever needed, if ever)
 
-**What:** Replace the Streamlit UI with a React + FastAPI frontend for client-facing use (demos, sales, investor presentations).
+**What:** Replace the Streamlit UI with a React + FastAPI frontend, if and only if production-scale deployment is ever required. This is not planned, not scheduled, and may never happen. It is documented here solely as a technical reference for what that migration would involve, should it ever become necessary.
 
-**Why it matters:** Streamlit is the right internal tool. React is the right product. The Python backend does not change at all — React calls a FastAPI wrapper instead of Python directly.
+**Why it matters:** Streamlit is the right internal tool. React is the right product if scale ever requires it. The Python backend does not change at all — React would call a FastAPI wrapper instead of Python directly.
 
 **Where to build it:**
 - `api.py` (new) — FastAPI: `POST /run` accepts two files, returns findings JSON

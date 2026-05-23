@@ -80,17 +80,17 @@ docker run --rm -p 8501:8501 mintlify-sentinel streamlit run app.py --server.add
 
 ---
 
-## Future — React Upgrade
+## Future — React Upgrade (if ever needed)
 
-When the product is client-facing or needs to be sold:
+If and only if production-scale deployment is ever required, and if that need ever arises:
 
 | Streamlit stays | React replaces |
 |----------------|----------------|
-| Internal dev tool | Public-facing product |
-| Your own pipeline runs | Client-facing demo |
-| Quick testing | Investor demo |
+| Internal dev tool | Public-facing deployment, if ever needed |
+| Personal pipeline runs | Shared access, if ever required |
+| Quick testing | Scale testing, if ever applicable |
 
-**Nothing in the Python backend changes.** The pipeline, the notifier, the diff engine — all identical. React calls the same functions through a FastAPI wrapper (one file, ~50 lines) instead of directly.
+**Nothing in the Python backend changes.** The pipeline, the notifier, the diff engine — all identical. React would call the same functions through a FastAPI wrapper (one file, ~50 lines) instead of directly. This is not planned or scheduled.
 
 ```python
 # api.py — FastAPI wrapper (when needed)
