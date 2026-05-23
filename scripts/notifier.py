@@ -30,9 +30,13 @@
 # =============================================================================
 
 import json
+import time
 import urllib.request
 import urllib.error
 import os
+
+# Seconds to wait between retry attempts: attempt 1→2 waits 2s, 2→3 waits 4s.
+_RETRY_DELAYS = (2, 4, 8)
 
 
 # =============================================================================
@@ -66,10 +70,15 @@ def _severity_counts(findings: list) -> tuple:
 # SECTION 2 — HTTP DISPATCHER
 # =============================================================================
 
-def _post_json(url: str, payload: dict) -> tuple:
+def _post_json(url: str, payload: dict, max_attempts: int = 3) -> tuple:
     """
     [POSTs a JSON payload to `url` using only stdlib urllib — no requests dep.
-     Returns (success: bool, status_code: int, error_message: str).]
+     Returns (success: bool, status_code: int, error_message: str).
+
+     Retries up to max_attempts times on 429 (rate limit) and 503 (service
+     temporarily unavailable) with exponential backoff from _RETRY_DELAYS.
+     All other failures (4xx except 429, URLError, unknown exceptions) return
+     immediately — retrying a 401 or 404 is pointless and wastes time.]
     """
     body = json.dumps(payload).encode("utf-8")
     req  = urllib.request.Request(
@@ -81,15 +90,24 @@ def _post_json(url: str, payload: dict) -> tuple:
         },
         method="POST",
     )
-    try:
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            return True, resp.status, ""
-    except urllib.error.HTTPError as exc:
-        return False, exc.code, str(exc.reason)
-    except urllib.error.URLError as exc:
-        return False, 0, str(exc.reason)
-    except Exception as exc:
-        return False, 0, str(exc)
+    last_code = 0
+    last_err  = ""
+    for attempt in range(max_attempts):
+        try:
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                return True, resp.status, ""
+        except urllib.error.HTTPError as exc:
+            last_code = exc.code
+            last_err  = str(exc.reason)
+            if exc.code in (429, 503) and attempt < max_attempts - 1:
+                time.sleep(_RETRY_DELAYS[attempt])
+                continue
+            return False, exc.code, str(exc.reason)
+        except urllib.error.URLError as exc:
+            return False, 0, str(exc.reason)
+        except Exception as exc:
+            return False, 0, str(exc)
+    return False, last_code, last_err
 
 
 # =============================================================================

@@ -16,7 +16,12 @@ def render_changelog(broken_contracts):
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     with open(output_file, "w", encoding="utf-8") as f:
         f.write(rendered_mdx)
-        
+
+    if not os.path.exists(output_file) or os.path.getsize(output_file) == 0:
+        raise RuntimeError(
+            f"[architect] Changelog write failed — output file is missing or empty: {output_file}"
+        )
+
     print(f"[architect] SUCCESS: Rendered changelog saved to {output_file}")
 
 if __name__ == "__main__":

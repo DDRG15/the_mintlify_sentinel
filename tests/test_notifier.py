@@ -10,7 +10,7 @@ SCRIPTS_DIR = os.path.join(ROOT_DIR, "scripts")
 if SCRIPTS_DIR not in sys.path:
     sys.path.insert(0, SCRIPTS_DIR)
 
-from notifier import notify, _build_slack_payload, _build_discord_payload
+from notifier import notify, _build_slack_payload, _build_discord_payload, _post_json
 
 
 # ---------------------------------------------------------------------------
@@ -243,3 +243,83 @@ class TestEnvVarFallback:
         with patch("urllib.request.urlopen", return_value=mock_resp):
             result = notify([], slack_url="", discord_url="")
         assert result["discord"]["sent"] is True
+
+
+# ---------------------------------------------------------------------------
+# _post_json — retry logic on 429 and 503
+# ---------------------------------------------------------------------------
+
+class TestPostJsonRetry:
+
+    def _mock_resp(self, status: int = 200):
+        r = MagicMock()
+        r.status = status
+        r.__enter__ = lambda s: r
+        r.__exit__ = MagicMock(return_value=False)
+        return r
+
+    def _http_err(self, code: int):
+        return urllib.error.HTTPError(
+            url=None, code=code, msg="Error", hdrs=None, fp=None
+        )
+
+    def test_succeeds_on_first_attempt(self):
+        with patch("urllib.request.urlopen", return_value=self._mock_resp(200)):
+            with patch("time.sleep") as mock_sleep:
+                ok, code, _ = _post_json("https://hooks.slack.com/fake", {})
+        assert ok is True
+        assert code == 200
+        mock_sleep.assert_not_called()
+
+    def test_retries_on_429_and_succeeds(self):
+        side_effects = [self._http_err(429), self._mock_resp(200)]
+        with patch("urllib.request.urlopen", side_effect=side_effects):
+            with patch("time.sleep") as mock_sleep:
+                ok, code, _ = _post_json("https://hooks.slack.com/fake", {})
+        assert ok is True
+        assert mock_sleep.call_count == 1
+        assert mock_sleep.call_args_list[0][0][0] == 2
+
+    def test_retries_on_503_and_succeeds(self):
+        side_effects = [self._http_err(503), self._http_err(503), self._mock_resp(200)]
+        with patch("urllib.request.urlopen", side_effect=side_effects):
+            with patch("time.sleep") as mock_sleep:
+                ok, code, _ = _post_json("https://hooks.slack.com/fake", {})
+        assert ok is True
+        assert mock_sleep.call_count == 2
+        assert mock_sleep.call_args_list[0][0][0] == 2
+        assert mock_sleep.call_args_list[1][0][0] == 4
+
+    def test_exhausts_retries_on_persistent_429(self):
+        with patch("urllib.request.urlopen", side_effect=self._http_err(429)):
+            with patch("time.sleep"):
+                ok, code, _ = _post_json("https://hooks.slack.com/fake", {})
+        assert ok is False
+        assert code == 429
+
+    def test_exhausts_retries_on_persistent_503(self):
+        with patch("urllib.request.urlopen", side_effect=self._http_err(503)):
+            with patch("time.sleep"):
+                ok, code, _ = _post_json("https://hooks.slack.com/fake", {})
+        assert ok is False
+        assert code == 503
+
+    def test_no_retry_on_400(self):
+        with patch("urllib.request.urlopen", side_effect=self._http_err(400)) as mock_open:
+            with patch("time.sleep") as mock_sleep:
+                ok, code, _ = _post_json("https://hooks.slack.com/fake", {})
+        assert ok is False
+        assert code == 400
+        mock_sleep.assert_not_called()
+        assert mock_open.call_count == 1
+
+    def test_no_retry_on_url_error(self):
+        with patch(
+            "urllib.request.urlopen",
+            side_effect=urllib.error.URLError("connection refused"),
+        ) as mock_open:
+            with patch("time.sleep") as mock_sleep:
+                ok, code, _ = _post_json("https://hooks.slack.com/fake", {})
+        assert ok is False
+        mock_sleep.assert_not_called()
+        assert mock_open.call_count == 1
