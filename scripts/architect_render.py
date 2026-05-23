@@ -13,7 +13,7 @@ def render_changelog(broken_contracts):
     template = env.get_template("changelog.mdx.jinja")
     rendered_mdx = template.render(changes=broken_contracts)
     output_file = os.path.join(OUTPUT_DIR, "changelog.mdx")
-    
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
     with open(output_file, "w", encoding="utf-8") as f:
         f.write(rendered_mdx)
         
