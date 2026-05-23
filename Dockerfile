@@ -23,18 +23,6 @@
 
 FROM python:3.12-slim
 
-# WeasyPrint (used by architect_pdf.py) requires Cairo and Pango native libs.
-# These are installed before pip so the layer is cached independently of
-# application code changes.
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libcairo2 \
-    libpango-1.0-0 \
-    libpangocairo-1.0-0 \
-    libgdk-pixbuf-2.0-0 \
-    libffi-dev \
-    shared-mime-info \
-    && rm -rf /var/lib/apt/lists/*
-
 WORKDIR /app
 
 # Copy requirements first — Docker caches this layer until requirements.txt

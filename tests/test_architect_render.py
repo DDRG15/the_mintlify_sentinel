@@ -132,6 +132,102 @@ class TestLowRendering:
 
 
 # ---------------------------------------------------------------------------
+# SCHEMA_DRIFT renders field-level change lists inside <Warning>
+# ---------------------------------------------------------------------------
+
+class TestSchemaDriftRendering:
+
+    _RESP_DRIFT = {
+        "signature": "GET /v1/users",
+        "method": "GET",
+        "path": "/v1/users",
+        "severity": "MEDIUM",
+        "change_type": "SCHEMA_DRIFT",
+        "description": "The response schema changed between versions.",
+        "response_schema_changes": [
+            {"field": "email",  "change": "field_removed"},
+            {"field": "phone",  "change": "field_added"},
+            {"field": "id",     "change": "type_changed", "from_type": "string", "to_type": "integer"},
+            {"field": "name",   "change": "became_required"},
+            {"field": "bio",    "change": "became_optional"},
+        ],
+        "request_body_schema_changes": [],
+    }
+
+    _REQ_DRIFT = {
+        "signature": "POST /v1/users",
+        "method": "POST",
+        "path": "/v1/users",
+        "severity": "MEDIUM",
+        "change_type": "SCHEMA_DRIFT",
+        "description": "The request body schema changed between versions.",
+        "response_schema_changes": [],
+        "request_body_schema_changes": [
+            {"field": "email", "change": "field_added"},
+        ],
+    }
+
+    def test_schema_drift_renders_warning_callout(self):
+        render_changelog([self._RESP_DRIFT])
+        content = _read_output()
+        assert "<Warning>" in content
+        assert "</Warning>" in content
+        assert "<Danger>" not in content
+
+    def test_response_schema_section_header_present(self):
+        render_changelog([self._RESP_DRIFT])
+        assert "Response schema field changes" in _read_output()
+
+    def test_field_removed_renders_in_output(self):
+        render_changelog([self._RESP_DRIFT])
+        content = _read_output()
+        assert "field removed" in content
+        assert "email" in content
+
+    def test_field_added_renders_in_output(self):
+        render_changelog([self._RESP_DRIFT])
+        content = _read_output()
+        assert "field added" in content
+        assert "phone" in content
+
+    def test_type_changed_renders_with_from_and_to(self):
+        render_changelog([self._RESP_DRIFT])
+        content = _read_output()
+        assert "type changed" in content
+        assert "string" in content
+        assert "integer" in content
+
+    def test_became_required_renders(self):
+        render_changelog([self._RESP_DRIFT])
+        assert "became required" in _read_output()
+
+    def test_became_optional_renders(self):
+        render_changelog([self._RESP_DRIFT])
+        assert "became optional" in _read_output()
+
+    def test_empty_response_changes_omits_section_header(self):
+        finding = {**self._RESP_DRIFT, "response_schema_changes": []}
+        render_changelog([finding])
+        assert "Response schema field changes" not in _read_output()
+
+    def test_request_body_section_header_present(self):
+        render_changelog([self._REQ_DRIFT])
+        assert "Request body schema field changes" in _read_output()
+
+    def test_request_body_field_added_renders(self):
+        render_changelog([self._REQ_DRIFT])
+        content = _read_output()
+        assert "field added" in content
+        assert "email" in content
+
+    def test_schema_drift_finding_keys_present_in_output(self):
+        render_changelog([self._RESP_DRIFT])
+        content = _read_output()
+        assert "SCHEMA_DRIFT" in content
+        assert "GET /v1/users" in content
+
+
+# ---------------------------------------------------------------------------
 # Mixed severities render all three callouts in correct order
 # ---------------------------------------------------------------------------
 

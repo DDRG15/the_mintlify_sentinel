@@ -16,16 +16,6 @@ jinja2==3.1.4
 # the diff engine would reject them with an "INVALID JSON" error.
 pyyaml==6.0.2
 
-# --- PDF rendering (architect_pdf.py) ---
-
-# Markdown: converts Markdown text to HTML before WeasyPrint processes it.
-markdown==3.6
-
-# WeasyPrint: renders HTML/CSS to PDF for the PDF changelog variant.
-# NOTE: requires libcairo2 + libpango system libraries (see Dockerfile).
-# Local install on Windows requires MSYS2/vcpkg; use Docker instead.
-weasyprint==62.3
-
 # --- Streamlit UI ---
 
 # Browser interface for the Sentinel pipeline.

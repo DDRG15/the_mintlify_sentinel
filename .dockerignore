@@ -40,6 +40,10 @@ secrets.json
 # CI config — not needed inside the container
 .github/
 
+# architect_pdf.py is gitignored and not part of the pipeline.
+# Exclude it so COPY . . does not copy it into the image.
+scripts/architect_pdf.py
+
 # Session notes
 TOMORROW.md
 

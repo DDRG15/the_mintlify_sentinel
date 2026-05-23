@@ -156,14 +156,16 @@ with tab_run:
     # ── RUN PIPELINE ─────────────────────────────────────────────────────────
 
     if run_clicked and baseline_file and target_file:
-        with tempfile.NamedTemporaryFile(suffix=".json", delete=False, mode="wb") as f1:
-            f1.write(baseline_file.getvalue())
-            baseline_path = f1.name
-        with tempfile.NamedTemporaryFile(suffix=".json", delete=False, mode="wb") as f2:
-            f2.write(target_file.getvalue())
-            target_path = f2.name
-
+        baseline_path = None
+        target_path = None
         try:
+            with tempfile.NamedTemporaryFile(suffix=".json", delete=False, mode="wb") as f1:
+                f1.write(baseline_file.getvalue())
+                baseline_path = f1.name
+            with tempfile.NamedTemporaryFile(suffix=".json", delete=False, mode="wb") as f2:
+                f2.write(target_file.getvalue())
+                target_path = f2.name
+
             log_buf = io.StringIO()
             with st.spinner("Running Sentinel..."):
                 with contextlib.redirect_stdout(log_buf):
@@ -188,8 +190,10 @@ with tab_run:
         except Exception as exc:
             st.error(f"Pipeline error: {exc}")
         finally:
-            os.unlink(baseline_path)
-            os.unlink(target_path)
+            if baseline_path and os.path.exists(baseline_path):
+                os.unlink(baseline_path)
+            if target_path and os.path.exists(target_path):
+                os.unlink(target_path)
 
     # ── RESULTS ──────────────────────────────────────────────────────────────
 
@@ -301,8 +305,10 @@ with tab_validate:
                 config_path = tf.name
 
             try:
+                val_log_buf = io.StringIO()
                 with st.spinner("Validating..."):
-                    is_valid = validate_docs_config(config_path)
+                    with contextlib.redirect_stdout(val_log_buf):
+                        is_valid = validate_docs_config(config_path)
 
                 if is_valid:
                     st.success(
@@ -310,10 +316,13 @@ with tab_validate:
                         "Safe to deploy."
                     )
                 else:
-                    st.error(
-                        f"**{config_file.name}** failed validation. "
-                        "Check the terminal output for field-level errors."
-                    )
+                    st.error(f"**{config_file.name}** failed validation.")
+
+                val_log = val_log_buf.getvalue()
+                if val_log:
+                    label = "Validation report" if is_valid else "Validation errors"
+                    with st.expander(label, expanded=not is_valid):
+                        st.code(val_log, language="text")
 
             except Exception as exc:
                 st.error(f"Validation error: {exc}")
