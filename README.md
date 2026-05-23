@@ -188,7 +188,6 @@ the_mintlify_sentinel/
     architect_render.py           Stage 3: Jinja2 MDX renderer
     notifier.py                   Slack + Discord webhook dispatcher
     historian.py                  Run history store (output/history.json)
-    architect_pdf.py              PDF variant (optional, requires system deps)
   templates/
     changelog.mdx.jinja           Jinja2 template
   tests/
@@ -198,11 +197,7 @@ the_mintlify_sentinel/
     test_architect_render.py
     test_notifier.py
   docs/
-    README_layperson.md           Non-technical explanation
-    README_semi_tech.md           Semi-technical overview
-    README_technical.md           Architecture reference
-    README_pitch.md               Product pitch
-    STREAMLIT_PLAN.md             UI implementation record
+    ROADMAP.md                    Feature roadmap
   .github/
     workflows/
       sentinel.yml                CI: test → pipeline → artifact upload
@@ -211,7 +206,5 @@ the_mintlify_sentinel/
 ---
 
 ## Known Limitations
-
-**`architect_pdf.py`** uses naive string replacement to convert Mintlify MDX callouts to HTML for PDF rendering. This is not in the main pipeline and is not covered by the test suite. Use the MDX output for production; the PDF variant is a utility for internal distribution only.
 
 **`weasyprint` on Windows** requires Cairo and Pango native libraries not available by default. Run inside Docker if PDF output is needed on a Windows machine.

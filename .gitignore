@@ -65,3 +65,11 @@ docs/README_layperson.md
 docs/README_semi_tech.md
 docs/README_technical.md
 docs/README_pitch.md
+docs/STREAMLIT_PLAN.md
+
+# Scratch templates — not part of the pipeline
+templates/callouts.mdx
+templates/sample_api.mdx
+
+# PDF utility — not in main pipeline
+scripts/architect_pdf.py
