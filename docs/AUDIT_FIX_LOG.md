@@ -166,17 +166,73 @@ Normal operation is identical to before. Both temp files are created, pipeline r
 
 ---
 
-## Test count before and after this audit
+## Finding 6 — Webhook notification has no retry on transient failures
 
-| Suite | Before | After |
-|-------|--------|-------|
-| `test_judge_config.py` | 13 | 13 |
-| `test_judge_diff.py` | 38 | 38 |
-| `test_architect_render.py` | 11 | 22 |
-| `test_notifier.py` | 17 | 17 |
-| **Total** | **95** | **106** |
+**Severity:** LOW
+**Persona:** SRE
 
-All 106 tests pass on Python 3.12 / Windows 10 and Ubuntu (CI).
+### 5W + How
+
+| | |
+|-|-|
+| **Who** | Any operator sending Slack or Discord alerts when the webhook endpoint is rate-limited or temporarily unavailable. |
+| **What** | `_post_json` made a single HTTP attempt. A 429 (rate limit) or 503 (service temporarily unavailable) response caused an immediate `sent: False` result with no retry. Transient infrastructure failures produced false permanent failures, silently suppressing the notification without any indication that a retry would have succeeded. |
+| **When** | Slack rate limits webhook bursts; Discord 503s during rolling deploys. Both are operational realities for production notification pipelines. |
+| **Where** | `scripts/notifier.py` — `_post_json` function. |
+| **Why** | The original implementation was a single-attempt dispatcher. Retry logic was not part of the initial scope. |
+| **How** | Added `import time` and `_RETRY_DELAYS = (2, 4, 8)` constant. Wrapped the HTTP call in a `for attempt in range(max_attempts)` loop (default 3). On 429 or 503, `time.sleep(_RETRY_DELAYS[attempt])` and continues. All other failures (4xx except 429, URLError, unknown exceptions) return immediately — retrying a 401 or 404 is pointless and wastes time. A fallback `return False, last_code, last_err` after the loop handles the case where all retries are exhausted. |
+
+### Files changed
+
+- `scripts/notifier.py` — `_post_json` signature extended to `(url, payload, max_attempts=3)`, retry loop added
+- `tests/test_notifier.py` — `TestPostJsonRetry` class (7 tests): success on first attempt, retry+succeed on 429, retry+succeed on 503, retry exhaustion on persistent 429, retry exhaustion on persistent 503, no-retry on 400, no-retry on URLError
+
+### Verification
+
+```bash
+pytest tests/test_notifier.py -v
+# 24 tests pass (17 original + 7 new)
+```
+
+---
+
+## Finding 7 — Changelog write has no post-write validation
+
+**Severity:** LOW
+**Persona:** SRE
+
+### 5W + How
+
+| | |
+|-|-|
+| **Who** | Any user of the pipeline when the output directory is on a full disk or a filesystem with restricted write permissions. |
+| **What** | `render_changelog()` opened `output/changelog.mdx` for writing, called `f.write(rendered_mdx)`, and then printed a success message — regardless of whether the file was actually written. A silent OS-level write failure (disk full, permission error on `os.makedirs` race) would produce an empty or missing output file while the pipeline exited 0 and reported success. |
+| **When** | Disk-full condition or filesystem permission error at write time. Does not occur under normal operating conditions. |
+| **Where** | `scripts/architect_render.py` — `render_changelog()` function, after the `with open(...)` block. |
+| **Why** | The write was trusted to succeed. Python's `open().write()` does not raise on a buffered partial write — it flushes on `__exit__`, but a disk-full condition during flush can surface as a silent empty file in edge cases. |
+| **How** | Added a post-write assertion immediately after the `with open(...)` block: checks `os.path.exists(output_file)` and `os.path.getsize(output_file) > 0`. Raises `RuntimeError` with the full output path if either condition fails. The success print only executes if the assertion passes. |
+
+### Files changed
+
+- `scripts/architect_render.py` — post-write validation block added after `f.write()`
+
+### Verification
+
+Normal operation: file exists, size > 0, success message prints. On simulated failure: `RuntimeError` raised with output path in message, pipeline exits non-zero.
+
+---
+
+## Test count before and after both audits
+
+| Suite | Pre-audit (v1.3) | After round 1 | After round 2 |
+|-------|--------|-------|-------|
+| `test_judge_config.py` | 13 | 13 | 13 |
+| `test_judge_diff.py` | 38 | 38 | 38 |
+| `test_architect_render.py` | 11 | 22 | 22 |
+| `test_notifier.py` | 17 | 17 | 24 |
+| **Total** | **95** | **106** | **113** |
+
+All 113 tests pass on Python 3.12 / Windows 10 and Ubuntu (CI).
 
 ---
 
