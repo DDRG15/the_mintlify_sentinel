@@ -53,3 +53,9 @@ secrets.json
 
 # Private — local only, never committed, never pushed
 private/
+
+# Dev session notes — internal only
+TOMORROW.md
+
+# Scratch test fixtures — not part of the project
+input/openapi.json
