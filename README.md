@@ -129,7 +129,7 @@ pytest tests/ -v
 pytest tests/ -v --cov=scripts --cov-report=term-missing
 ```
 
-95 tests across 4 modules: `test_judge_config`, `test_judge_diff`, `test_architect_render`, `test_notifier`. Covers all three severity tiers, edge cases (empty spec, malformed JSON, vendor extension keys), webhook HTTP success/failure paths, field-level schema diff assertions, and integration tests against the real fixture files. A session fixture in `conftest.py` preserves `output/changelog.mdx` across test runs.
+106 tests across 4 modules: `test_judge_config`, `test_judge_diff`, `test_architect_render`, `test_notifier`. Covers all three severity tiers, edge cases (empty spec, malformed JSON, vendor extension keys), webhook HTTP success/failure paths, field-level schema diff assertions, SCHEMA_DRIFT callout rendering, and integration tests against the real fixture files. A session fixture in `conftest.py` preserves `output/changelog.mdx` across test runs.
 
 ---
 
