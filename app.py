@@ -1,6 +1,7 @@
 import contextlib
 import io
 import os
+import random
 import sys
 import tempfile
 from datetime import datetime
@@ -19,6 +20,66 @@ from architect_render import render_changelog
 from judge_config     import validate_docs_config
 from notifier         import notify
 from historian        import append_run, load_history
+
+
+# =============================================================================
+# PHRASE LISTS
+# =============================================================================
+
+_LOADING_PHRASES = [
+    "Bribing the hamster...",
+    "Waking up the minions...",
+    "Feeding the unicorns...",
+    "Walking the dog...",
+    "Herding cats...",
+    "Petting the llama...",
+    "Untangling the spaghetti...",
+    "Converting bugs to features...",
+    "Waiting for the intern to finish...",
+    "Kindly hold on as our intern quits vim...",
+    "Searching for the missing semicolon...",
+    "Optimizing the 'Hello World'...",
+    "Compiling thoughts...",
+    "Refactoring reality...",
+    "Checking Stack Overflow...",
+    "Switching to the latest JS framework...",
+    "Ignoring deprecation warnings...",
+    "Dividing by zero...",
+    "Looking for the 10x developer...",
+    "Reticulating splines...",
+    "Summoning Clippy...",
+    "Mining diamonds...",
+    "Consulting the oracle...",
+    "Winter is coming...",
+    "Loading the Matrix...",
+    "Generating more pylons...",
+    "Brewing coffee...",
+    "Reheating pizza...",
+    "Installing updates...",
+    "TODO: Insert elevator music...",
+    "Looking for sense of humour...",
+    "Still faster than Windows update...",
+    "Contemplating the meaning of life...",
+    "Asking the rubber duck for advice...",
+    "Procrastinating effectively...",
+]
+
+_DONE_PHRASES = [
+    "Hamster has been fed.",
+    "The minions are going back to sleep.",
+    "Spaghetti successfully untangled.",
+    "The rubber duck approves.",
+    "Logic successfully applied (somehow).",
+    "The oracle has spoken.",
+    "Intern has successfully exited Vim.",
+    "The cake was a lie, but here's your data.",
+    "Everything is fine. Definitely.",
+    "At least it didn't explode.",
+    "The bug has been promoted to feature.",
+    "Ship it!",
+    "Still faster than Windows update.",
+    "Don't look at the logs. Just don't.",
+]
 
 
 # =============================================================================
@@ -167,7 +228,7 @@ with tab_run:
                 target_path = f2.name
 
             log_buf = io.StringIO()
-            with st.spinner("Running Sentinel..."):
+            with st.spinner(random.choice(_LOADING_PHRASES)):
                 with contextlib.redirect_stdout(log_buf):
                     findings = run_diff(baseline_path, target_path)
                     render_changelog(findings)
@@ -186,6 +247,7 @@ with tab_run:
             st.session_state["last_run"]     = datetime.now().strftime("%H:%M:%S")
             st.session_state["notif_result"] = notif_result
             st.session_state["pipeline_log"] = log_buf.getvalue()
+            st.session_state["done_phrase"]  = random.choice(_DONE_PHRASES)
 
         except Exception as exc:
             st.error(f"Pipeline error: {exc}")
@@ -206,7 +268,7 @@ with tab_run:
         low      = sum(1 for f in findings if f.get("severity") == "LOW")
 
         st.divider()
-        st.caption(f"Last run: {last_run}")
+        st.caption(f"Last run: {last_run}  ·  {st.session_state.get('done_phrase', '')}")
 
         # Summary bar
         c1, c2, c3, c4 = st.columns(4)
@@ -306,7 +368,7 @@ with tab_validate:
 
             try:
                 val_log_buf = io.StringIO()
-                with st.spinner("Validating..."):
+                with st.spinner(random.choice(_LOADING_PHRASES)):
                     with contextlib.redirect_stdout(val_log_buf):
                         is_valid = validate_docs_config(config_path)
 
@@ -315,6 +377,7 @@ with tab_validate:
                         f"**{config_file.name}** is structurally valid. "
                         "Safe to deploy."
                     )
+                    st.caption(random.choice(_DONE_PHRASES))
                 else:
                     st.error(f"**{config_file.name}** failed validation.")
 
