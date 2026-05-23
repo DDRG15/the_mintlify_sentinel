@@ -59,3 +59,9 @@ TOMORROW.md
 
 # Scratch test fixtures — not part of the project
 input/openapi.json
+
+# Internal docs — not for the public repo
+docs/README_layperson.md
+docs/README_semi_tech.md
+docs/README_technical.md
+docs/README_pitch.md
